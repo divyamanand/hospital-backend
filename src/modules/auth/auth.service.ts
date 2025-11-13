@@ -1,22 +1,34 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Staff } from '../../entities/staff.entity';
+import { Patient } from '../../entities/patient.entity';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly jwt: JwtService) {}
+  constructor(
+    private readonly jwt: JwtService,
+    @InjectRepository(Staff) private staffRepo: Repository<Staff>,
+    @InjectRepository(Patient) private patientRepo: Repository<Patient>,
+  ) {}
 
   // NOTE: Replace with real user lookup and password verification
   async validateUser(email: string, password: string) {
     if (!email || !password) return null;
-    // Accept any non-empty for demo; plug in real check against Staff/Patient later
-    return { id: email, email } as any;
+    // Demo: lookup by email; no password check
+    const patient = await this.patientRepo.findOne({ where: { email } });
+    if (patient) return { id: patient.id, email: patient.email, role: 'patient' } as any;
+    const staff = await this.staffRepo.findOne({ where: { email } });
+    if (staff) return { id: staff.id, email: staff.email, role: staff.role } as any;
+    return null;
   }
 
   signAccessToken(user: any) {
-    return this.jwt.sign({ sub: user.id, email: user.email, type: 'access' }, { secret: process.env.JWT_SECRET || 'dev_secret_change_me', expiresIn: process.env.ACCESS_TTL || '15m' });
+    return this.jwt.sign({ sub: user.id, email: user.email, role: user.role, type: 'access' }, { secret: process.env.JWT_SECRET || 'dev_secret_change_me', expiresIn: process.env.ACCESS_TTL || '15m' });
   }
   signRefreshToken(user: any) {
-    return this.jwt.sign({ sub: user.id, email: user.email, type: 'refresh' }, { secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'dev_secret_change_me', expiresIn: process.env.REFRESH_TTL || '7d' });
+    return this.jwt.sign({ sub: user.id, email: user.email, role: user.role, type: 'refresh' }, { secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'dev_secret_change_me', expiresIn: process.env.REFRESH_TTL || '7d' });
   }
 
   async login(body: any, res?: any) {
@@ -38,7 +50,7 @@ export class AuthService {
     } catch (e) {
       throw new UnauthorizedException('Invalid refresh token');
     }
-    const user = { id: payload.sub, email: payload.email };
+    const user = { id: payload.sub, email: payload.email, role: payload.role };
     const access = this.signAccessToken(user);
     const refresh = this.signRefreshToken(user);
     this.setAuthCookies(res, access, refresh);
