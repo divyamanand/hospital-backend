@@ -24,6 +24,8 @@ export enum StaffRole {
   Admin = 'admin',
   LabTech = 'lab_tech',
   Pharmacist = 'pharmacist',
+  Inventory = 'inventory',
+  RoomManager = 'room_manager',
 }
 
 export enum StaffStatus {

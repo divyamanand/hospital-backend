@@ -10,30 +10,30 @@ export class RoomController {
   constructor(private readonly svc: RoomService) {}
 
   @Get()
-  @Roles('admin','receptionist','doctor')
+  @Roles('admin','room_manager')
   list() { return this.svc.findAll(); }
   @Get(':id')
-  @Roles('admin','receptionist','doctor')
+  @Roles('admin','room_manager')
   get(@Param('id') id: string) { return this.svc.findOne(id); }
   @Post()
-  @Roles('admin','receptionist')
+  @Roles('admin','room_manager')
   create(@Body() body: any) { return this.svc.create(body); }
   @Put(':id')
-  @Roles('admin','receptionist')
+  @Roles('admin','room_manager')
   update(@Param('id') id: string, @Body() body: any) { return this.svc.update(id, body); }
   @Delete(':id')
-  @Roles('admin','receptionist')
+  @Roles('admin','room_manager')
   remove(@Param('id') id: string) { return this.svc.remove(id); }
 
   @Post(':id/book')
-  @Roles('admin','receptionist')
+  @Roles('admin','room_manager')
   book(@Param('id') id: string, @Body() body: any) { return this.svc.book(id, body); }
 
   @Post(':id/status')
-  @Roles('admin','receptionist')
+  @Roles('admin','room_manager')
   changeStatus(@Param('id') id: string, @Body() body: { status: string }) { return this.svc.changeStatus(id, body.status as any); }
 
   @Get('available/list')
-  @Roles('admin','receptionist','doctor')
+  @Roles('admin','room_manager')
   available(@Query('type') type?: string) { return this.svc.findAvailable(type as any); }
 }
