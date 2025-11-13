@@ -25,10 +25,16 @@ export class AuthService {
   }
 
   signAccessToken(user: any) {
-    return this.jwt.sign({ sub: user.id, email: user.email, role: user.role, type: 'access' }, { secret: process.env.JWT_SECRET || 'dev_secret_change_me', expiresIn: process.env.ACCESS_TTL || '15m' });
+    return this.jwt.sign(
+      { sub: user.id, email: user.email, role: user.role, type: 'access' },
+      { secret: process.env.JWT_SECRET || 'dev_secret_change_me', expiresIn: (process.env.ACCESS_TTL || '15m') as any },
+    );
   }
   signRefreshToken(user: any) {
-    return this.jwt.sign({ sub: user.id, email: user.email, role: user.role, type: 'refresh' }, { secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'dev_secret_change_me', expiresIn: process.env.REFRESH_TTL || '7d' });
+    return this.jwt.sign(
+      { sub: user.id, email: user.email, role: user.role, type: 'refresh' },
+      { secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'dev_secret_change_me', expiresIn: (process.env.REFRESH_TTL || '7d') as any },
+    );
   }
 
   async login(body: any, res?: any) {
