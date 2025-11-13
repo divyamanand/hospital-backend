@@ -1,8 +1,8 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Staff } from '../../entities/staff.entity';
+import { Staff, StaffRole, StaffStatus, WorkType } from '../../entities/staff.entity';
 import { Patient } from '../../entities/patient.entity';
 import { RefreshToken } from '../../entities/refresh-token.entity';
 import { hashRefresh } from './refresh.util';
@@ -175,6 +175,38 @@ export class AuthService {
     const sessionUser = { id: sub, email: user.email, role: user.role } as any;
     await this.createSession(sessionUser, res);
     return { user: sessionUser };
+  }
+
+  async bootstrapAdmin(body: any, res: any) {
+    const { email, password, firstName = 'Admin', lastName = '', secret } = body || {};
+    if (!email || !password) throw new BadRequestException('email and password are required');
+
+    const count = await this.userRepo.count();
+    const bootSecret = process.env.BOOTSTRAP_SECRET;
+    if (count > 0) {
+      if (!bootSecret || secret !== bootSecret) {
+        throw new ForbiddenException('bootstrap disabled (already initialized)');
+      }
+    }
+
+    const existing = await this.userRepo.findOne({ where: { email } });
+    if (existing) throw new BadRequestException('Email already in use');
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const user = await this.userRepo.save(this.userRepo.create({ email, passwordHash, role: UserRole.Admin }));
+
+    await this.staffRepo.save(this.staffRepo.create({
+      user: { id: user.id } as any,
+      role: StaffRole.Admin,
+      firstName,
+      lastName,
+      status: StaffStatus.Active,
+      workType: WorkType.FullTime,
+    } as any));
+    const createdStaff = await this.staffRepo.findOne({ where: { user: { id: user.id } as any } });
+    const sessionUser = { id: createdStaff?.id, email: user.email, role: UserRole.Admin } as any;
+    await this.createSession(sessionUser, res);
+    return { user: { id: user.id, email: user.email, role: user.role }, staff: { id: createdStaff?.id, firstName, lastName } };
   }
 }
 

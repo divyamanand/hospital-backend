@@ -43,4 +43,10 @@ export class AuthController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   me(@Req() req: any) { return this.svc.me(req); }
+
+  // One-time initializer: create the first admin when no users exist, or with secret
+  @Post('bootstrap-admin')
+  bootstrapAdmin(@Body() body: any, @Res({ passthrough: true }) res: any) {
+    return this.svc.bootstrapAdmin(body, res);
+  }
 }
