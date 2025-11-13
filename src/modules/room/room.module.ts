@@ -3,10 +3,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Room } from '../../entities/room.entity';
 import { RoomController } from './room.controller';
 import { RoomService } from './room.service';
+import { RolesGuard } from '../auth/roles.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Module({
 	imports: [TypeOrmModule.forFeature([Room])],
 	controllers: [RoomController],
-	providers: [RoomService],
+	providers: [RoomService, RolesGuard, JwtAuthGuard],
 })
 export class RoomModule {}

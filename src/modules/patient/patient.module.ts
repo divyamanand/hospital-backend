@@ -6,11 +6,12 @@ import { Patient } from '../../entities/patient.entity';
 import { Appointment } from '../../entities/appointment.entity';
 import { RolesGuard } from '../auth/roles.guard';
 import { PatientOrDoctorGuard } from '../auth/patient-or-doctor.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Patient, Appointment])],
   controllers: [PatientController],
-  providers: [PatientService, RolesGuard, PatientOrDoctorGuard],
+  providers: [PatientService, RolesGuard, PatientOrDoctorGuard, JwtAuthGuard],
   exports: [PatientService]
 })
 export class PatientModule {}

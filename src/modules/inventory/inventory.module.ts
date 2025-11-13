@@ -6,10 +6,12 @@ import { Prescription } from '../../entities/prescription.entity';
 import { PrescriptionItem } from '../../entities/prescription-item.entity';
 import { InventoryController } from './inventory.controller';
 import { InventoryService } from './inventory.service';
+import { RolesGuard } from '../auth/roles.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Module({
 	imports: [TypeOrmModule.forFeature([InventoryItem, InventoryTransaction, Prescription, PrescriptionItem])],
 	controllers: [InventoryController],
-	providers: [InventoryService],
+	providers: [InventoryService, RolesGuard, JwtAuthGuard],
 })
 export class InventoryModule {}
