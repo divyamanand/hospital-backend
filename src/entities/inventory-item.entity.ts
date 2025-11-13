@@ -27,10 +27,10 @@ export class InventoryItem {
   @Column({ type: 'enum', enum: InventoryType })
   type!: InventoryType;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   brand!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   batchNo!: string | null;
 
   @Column({ type: 'date', nullable: true })
@@ -42,10 +42,10 @@ export class InventoryItem {
   @Column({ type: 'int', default: 0 })
   reorderLevel!: number;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   unit!: string | null; // tablets, ml, pcs
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   location!: string | null;
 
   @Column({ type: 'enum', enum: InventoryStatus, default: InventoryStatus.Active })

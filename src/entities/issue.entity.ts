@@ -14,10 +14,10 @@ export class Issue {
   id!: string;
 
   @Index('idx_issue_code', { unique: true })
-  @Column({ nullable: true, unique: true })
+  @Column({ type: 'varchar', nullable: true, unique: true })
   code!: string | null;
 
-  @Column()
+  @Column({ type: 'varchar' })
   title!: string;
 
   @Column({ type: 'text', nullable: true })

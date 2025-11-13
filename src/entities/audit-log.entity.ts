@@ -14,7 +14,7 @@ export class AuditLog {
   @Column()
   action!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   performedBy!: string | null;
 
   @Column({ type: 'json', nullable: true })

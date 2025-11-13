@@ -53,18 +53,18 @@ export class Staff {
   lastName!: string;
 
   @Index('idx_staff_email', { unique: true })
-  @Column({ nullable: true, unique: true })
+  @Column({ type: 'varchar', nullable: true, unique: true })
   email!: string | null;
 
   @Index('idx_staff_phone', { unique: true })
-  @Column({ nullable: true, unique: true })
+  @Column({ type: 'varchar', nullable: true, unique: true })
   phone!: string | null;
 
   @Index('idx_staff_employee_id', { unique: true })
-  @Column({ nullable: true, unique: true })
+  @Column({ type: 'varchar', nullable: true, unique: true })
   employeeId!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   designation!: string | null;
 
   @Column({ type: 'text', nullable: true })
@@ -99,14 +99,6 @@ export class Staff {
 
   @UpdateDateColumn()
   updatedAt!: Date;
-
-  @ManyToMany(() => Specialty, (s) => s.staff)
-  @JoinTable({
-    name: 'staff_specialty',
-    joinColumn: { name: 'staff_id', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'specialty_id', referencedColumnName: 'id' },
-  })
-  specialties!: Specialty[];
 
   @OneToMany(() => StaffSpecialty, (ss) => ss.staff)
   staffSpecialties!: StaffSpecialty[];

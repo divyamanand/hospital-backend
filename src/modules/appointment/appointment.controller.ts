@@ -9,7 +9,7 @@ export class AppointmentController {
   @Get(':id')
   get(@Param('id') id: string) { return this.svc.findOne(id); }
   @Post()
-  create(@Body() body: any) { return this.svc.create(body); }
+  createOrBook(@Body() body: any) { return this.svc.book(body); }
 
   @Post('findMatchingDoctorsForIssues')
   findMatchingDoctors(@Body() body: { issues: string[]; timeWindow?: any; appointment_type?: string }) {
@@ -19,14 +19,22 @@ export class AppointmentController {
   @Get('doctor/:doctorId/next3Slots')
   nextSlots(@Param('doctorId') doctorId: string) { return this.svc.getDoctorNext3Slots(doctorId); }
 
-  @Post('book')
-  book(@Body() body: any) { return this.svc.book(body); }
-
   @Put(':id')
   update(@Param('id') id: string, @Body() body: any) { return this.svc.update(id, body); }
 
+  @Post(':id/cancel')
+  cancelWithReason(@Param('id') id: string, @Body() body: { reason?: string }) {
+    return this.svc.cancel(id, body?.reason);
+  }
+
   @Delete(':id')
   cancel(@Param('id') id: string) { return this.svc.cancel(id); }
+
+  @Put(':id/patch')
+  patch(@Param('id') id: string, @Body() body: any) { return this.svc.update(id, body); }
+
+  @Delete(':id/hard')
+  hardDelete(@Param('id') id: string) { return this.svc.remove(id); }
 
   @Post(':id/confirm')
   confirm(@Param('id') id: string) { return this.svc.transition(id, 'confirm'); }

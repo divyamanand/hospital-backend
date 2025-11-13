@@ -29,4 +29,58 @@ export class StaffService {
   addLeave(staffId: string, leave: Partial<Leave>) {
     return this.leaveRepo.save(this.leaveRepo.create({ ...leave, staff: { id: staffId } as any }));
   }
+
+  // Timings CRUD
+  createTiming(staffId: string, timing: Partial<Timings>) {
+    return this.timingsRepo.save(this.timingsRepo.create({ ...timing, staff: { id: staffId } as any }));
+  }
+
+  getTimingById(staffId: string, timingId: string) {
+    return this.timingsRepo.findOne({ where: { id: timingId, staff: { id: staffId } as any } as any });
+  }
+
+  async updateTiming(staffId: string, timingId: string, data: Partial<Timings>) {
+    await this.timingsRepo.createQueryBuilder()
+      .update(Timings)
+      .set(data)
+      .where('id = :id AND staff_id = :sid', { id: timingId, sid: staffId })
+      .execute();
+    return this.getTimingById(staffId, timingId);
+  }
+
+  async deleteTiming(staffId: string, timingId: string) {
+    await this.timingsRepo.createQueryBuilder()
+      .delete()
+      .from(Timings)
+      .where('id = :id AND staff_id = :sid', { id: timingId, sid: staffId })
+      .execute();
+    return { id: timingId, removed: true } as any;
+  }
+
+  // Leaves CRUD
+  listLeaves(staffId: string) {
+    return this.leaveRepo.find({ where: { staff: { id: staffId } as any } });
+  }
+
+  getLeaveById(staffId: string, leaveId: string) {
+    return this.leaveRepo.findOne({ where: { id: leaveId, staff: { id: staffId } as any } as any });
+  }
+
+  async updateLeave(staffId: string, leaveId: string, data: Partial<Leave>) {
+    await this.leaveRepo.createQueryBuilder()
+      .update(Leave)
+      .set(data)
+      .where('id = :id AND staff_id = :sid', { id: leaveId, sid: staffId })
+      .execute();
+    return this.getLeaveById(staffId, leaveId);
+  }
+
+  async deleteLeave(staffId: string, leaveId: string) {
+    await this.leaveRepo.createQueryBuilder()
+      .delete()
+      .from(Leave)
+      .where('id = :id AND staff_id = :sid', { id: leaveId, sid: staffId })
+      .execute();
+    return { id: leaveId, removed: true } as any;
+  }
 }

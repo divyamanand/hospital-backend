@@ -10,7 +10,7 @@ export class RequirementFulfillment {
   @JoinColumn({ name: 'requirement_id' })
   requirement!: Requirement;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   fulfilledById!: string | null;
 
   @Column({ type: 'timestamp', nullable: true })

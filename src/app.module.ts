@@ -11,7 +11,6 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { RoomModule } from './modules/room/room.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { SpecialtyModule } from './modules/specialty/specialty.module';
-import { IssueModule } from './modules/issue/issue.module';
 import { RequirementModule } from './modules/requirement/requirement.module';
 
 @Module({
@@ -39,7 +38,6 @@ import { RequirementModule } from './modules/requirement/requirement.module';
     RoomModule,
     AuthModule,
     SpecialtyModule,
-    IssueModule,
     RequirementModule,
   ],
 })

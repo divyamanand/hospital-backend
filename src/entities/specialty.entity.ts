@@ -1,5 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, Index, CreateDateColumn, UpdateDateColumn, ManyToMany } from 'typeorm';
-import { Staff } from './staff.entity';
+import { Entity, PrimaryGeneratedColumn, Column, Index, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { StaffSpecialty } from './staff-specialty.entity';
 
 @Entity({ name: 'specialty' })
 export class Specialty {
@@ -22,6 +22,6 @@ export class Specialty {
   @UpdateDateColumn()
   updatedAt!: Date;
 
-  @ManyToMany(() => Staff, (s) => s.specialties)
-  staff!: Staff[];
+  @OneToMany(() => StaffSpecialty, (ss) => ss.specialty)
+  staffSpecialties!: StaffSpecialty[];
 }

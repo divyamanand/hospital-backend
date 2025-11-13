@@ -36,7 +36,7 @@ export class Room {
   @Column({ type: 'json', nullable: true })
   features!: any | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   currentPatientId!: string | null;
 
   @CreateDateColumn()

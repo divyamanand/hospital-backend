@@ -13,12 +13,15 @@ export class IssueService {
   findAll() { return this.issueRepo.find({ relations: ['mappedSpecialty'] }); }
 
   async getMappedDoctors(issueId: string) {
-    // selects doctors by mapped specialty; returns doctor ids
+    // selects active doctors by mapped specialty; returns doctor ids ordered by primary mapping
     const issue = await this.issueRepo.findOne({ where: { id: issueId }, relations: ['mappedSpecialty'] });
     if (!issue?.mappedSpecialty) return [];
-    // staff_specialty table join
     const rows = await this.issueRepo.query(
-      `SELECT ss.staff_id as "staffId" FROM staff_specialty ss WHERE ss.specialty_id = $1`,
+      `SELECT ss.staff_id as "staffId"
+       FROM staff_specialty ss
+       JOIN staff s ON s.id = ss.staff_id
+       WHERE ss.specialty_id = $1 AND s.role = 'doctor' AND s.status = 'active'
+       ORDER BY ss.primary DESC`,
       [issue.mappedSpecialty.id],
     );
     return rows.map((r: any) => r.staffId);

@@ -24,12 +24,12 @@ export class InventoryTransaction {
   @Column({ type: 'enum', enum: InventoryChangeReason })
   reason!: InventoryChangeReason;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   referenceId!: string | null; // e.g., prescription_item_id
 
   @CreateDateColumn()
   createdAt!: Date;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   createdBy!: string | null;
 }

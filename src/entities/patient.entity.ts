@@ -33,18 +33,18 @@ export class Patient {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ nullable: false })
+  @Column({ type: 'varchar', nullable: false })
   firstName!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   lastName!: string | null;
 
   @Index('idx_patient_email', { unique: true })
-  @Column({ nullable: true, unique: true })
+  @Column({ type: 'varchar', nullable: true, unique: true })
   email!: string | null;
 
   @Index('idx_patient_phone', { unique: true })
-  @Column({ nullable: true, unique: true })
+  @Column({ type: 'varchar', nullable: true, unique: true })
   phone!: string | null;
 
   @Column({ type: 'date', nullable: true })
@@ -59,14 +59,14 @@ export class Patient {
   @Column({ type: 'text', nullable: true })
   address!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   emergencyContactName!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   emergencyContactPhone!: string | null;
 
   @Index('idx_patient_mrn', { unique: true })
-  @Column({ nullable: true, unique: true })
+  @Column({ type: 'varchar', nullable: true, unique: true })
   medicalRecordNumber!: string | null; // MRN
 
   @Column({ type: 'text', nullable: true })
@@ -75,10 +75,10 @@ export class Patient {
   @Column({ type: 'text', nullable: true })
   chronicConditions!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   insuranceProvider!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   insurancePolicyNo!: string | null;
 
   @ManyToOne(() => Staff, { nullable: true })
@@ -88,10 +88,10 @@ export class Patient {
   @Column({ type: 'text', nullable: true })
   notes!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   createdBy!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   updatedBy!: string | null;
 
   @Column({ default: false })

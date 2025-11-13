@@ -94,7 +94,7 @@ export class Appointment {
   @Column({ type: 'text', nullable: true })
   notes!: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   createdFromPrescriptionId!: string | null;
 
   @Column({ type: 'text', nullable: true })
