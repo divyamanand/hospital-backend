@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Put } from '@nestjs/common';
 import { PatientService } from './patient.service';
 
 @Controller('patients')
@@ -13,4 +13,10 @@ export class PatientController {
 
   @Post()
   create(@Body() body: any) { return this.svc.create(body); }
+
+  @Put(':id')
+  update(@Param('id') id: string, @Body() body: any) { return this.svc.update(id, body); }
+
+  @Get(':id/doctors-from-prescription')
+  doctorsFromPrescription(@Param('id') id: string) { return this.svc.getDoctorsFromPrescriptions(id); }
 }
