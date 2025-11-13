@@ -8,11 +8,14 @@ import {
   ManyToMany,
   JoinTable,
   OneToMany,
+  OneToOne,
+  JoinColumn,
 } from 'typeorm';
 import { Specialty } from './specialty.entity';
 import { StaffSpecialty } from './staff-specialty.entity';
 import { Timings } from './timings.entity';
 import { Leave } from './leave.entity';
+import { User } from './user.entity';
 
 export enum StaffRole {
   Doctor = 'doctor',
@@ -52,9 +55,7 @@ export class Staff {
   @Column({ nullable: true })
   lastName!: string;
 
-  @Index('idx_staff_email', { unique: true })
-  @Column({ type: 'varchar', nullable: true, unique: true })
-  email!: string | null;
+  // Email is now on User entity
 
   @Index('idx_staff_phone', { unique: true })
   @Column({ type: 'varchar', nullable: true, unique: true })
@@ -108,4 +109,9 @@ export class Staff {
 
   @OneToMany(() => Leave, (l) => l.staff)
   leaves!: Leave[];
+
+  // Link to base user for authentication/authorization
+  @OneToOne(() => User, (u: User) => u.staff, { nullable: true })
+  @JoinColumn({ name: 'user_id' })
+  user?: User | null;
 }

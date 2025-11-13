@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { Staff } from '../../entities/staff.entity';
 import { Timings } from '../../entities/timings.entity';
 import { Leave } from '../../entities/leave.entity';
+import { User, UserRole } from '../../entities/user.entity';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class StaffService {
@@ -11,8 +13,25 @@ export class StaffService {
     @InjectRepository(Staff) private repo: Repository<Staff>,
     @InjectRepository(Timings) private timingsRepo: Repository<Timings>,
     @InjectRepository(Leave) private leaveRepo: Repository<Leave>,
+    @InjectRepository(User) private userRepo: Repository<User>,
   ) {}
-  create(data: Partial<Staff>) { return this.repo.save(this.repo.create(data)); }
+
+  async create(data: any) {
+    const { email, password, role, ...rest } = data || {};
+    if (!role && !rest?.role) throw new Error('staff role is required');
+    const staffRole = (role || rest.role);
+    if (email && password) {
+      const exists = await this.userRepo.findOne({ where: { email } });
+      if (exists) throw new Error('Email already in use');
+      const passwordHash = await bcrypt.hash(password, 10);
+      const user = await this.userRepo.save(this.userRepo.create({ email, passwordHash, role: staffRole }));
+      const staff = this.repo.create({ ...rest, role: staffRole, user: { id: user.id } as any });
+      return this.repo.save(staff);
+    }
+    // Create staff profile only; invite later to set password
+    const staff = this.repo.create({ ...rest, role: staffRole });
+    return this.repo.save(staff);
+  }
   findAll() { return this.repo.find(); }
   findOne(id: string) { return this.repo.findOne({ where: { id } }); }
   async update(id: string, data: Partial<Staff>) { await this.repo.update({ id }, data); return this.findOne(id); }

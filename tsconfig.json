@@ -12,7 +12,11 @@
     "incremental": true,
     "skipLibCheck": true,
     "strict": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "typeRoots": [
+      "./src/types",
+      "./node_modules/@types"
+    ]
   },
   "exclude": ["node_modules", "dist"]
 }

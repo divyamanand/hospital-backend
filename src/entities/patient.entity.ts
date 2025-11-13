@@ -5,10 +5,12 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToOne,
   JoinColumn,
   Index,
 } from 'typeorm';
 import { Staff } from './staff.entity';
+import { User } from './user.entity';
 
 export enum PatientGender {
   Male = 'male',
@@ -39,9 +41,7 @@ export class Patient {
   @Column({ type: 'varchar', nullable: true })
   lastName!: string | null;
 
-  @Index('idx_patient_email', { unique: true })
-  @Column({ type: 'varchar', nullable: true, unique: true })
-  email!: string | null;
+  // Email is now stored on User entity
 
   @Index('idx_patient_phone', { unique: true })
   @Column({ type: 'varchar', nullable: true, unique: true })
@@ -102,4 +102,9 @@ export class Patient {
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  // Link to base user for authentication/authorization
+  @OneToOne(() => User, (u: User) => u.patient, { nullable: true })
+  @JoinColumn({ name: 'user_id' })
+  user?: User | null;
 }

@@ -1,9 +1,15 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Staff } from '../../entities/staff.entity';
 import { Patient } from '../../entities/patient.entity';
+import { RefreshToken } from '../../entities/refresh-token.entity';
+import { hashRefresh } from './refresh.util';
+import { User, UserRole } from '../../entities/user.entity';
+import { Invitation } from '../../entities/invitation.entity';
+import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -11,23 +17,33 @@ export class AuthService {
     private readonly jwt: JwtService,
     @InjectRepository(Staff) private staffRepo: Repository<Staff>,
     @InjectRepository(Patient) private patientRepo: Repository<Patient>,
+    @InjectRepository(RefreshToken) private refreshRepo: Repository<RefreshToken>,
+    @InjectRepository(User) private userRepo: Repository<User>,
+    @InjectRepository(Invitation) private inviteRepo: Repository<Invitation>,
   ) {}
 
-  // NOTE: Replace with real user lookup and password verification
   async validateUser(email: string, password: string) {
     if (!email || !password) return null;
-    // Demo: lookup by email; no password check
-    const patient = await this.patientRepo.findOne({ where: { email } });
-    if (patient) return { id: patient.id, email: patient.email, role: 'patient' } as any;
-    const staff = await this.staffRepo.findOne({ where: { email } });
-    if (staff) return { id: staff.id, email: staff.email, role: staff.role } as any;
-    return null;
+    const user = await this.userRepo.findOne({ where: { email } });
+    if (!user) return null;
+    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (!ok) return null;
+    // Determine domain id for token subject
+    if (user.role === UserRole.Patient) {
+      const patient = await this.patientRepo.findOne({ where: { user: { id: user.id } as any } });
+      if (!patient) return null;
+      return { id: patient.id, email: user.email, role: user.role };
+    } else {
+      const staff = await this.staffRepo.findOne({ where: { user: { id: user.id } as any } });
+      if (!staff) return null;
+      return { id: staff.id, email: user.email, role: user.role };
+    }
   }
 
   signAccessToken(user: any) {
     return this.jwt.sign(
       { sub: user.id, email: user.email, role: user.role, type: 'access' },
-      { secret: process.env.JWT_SECRET || 'dev_secret_change_me', expiresIn: (process.env.ACCESS_TTL || '15m') as any },
+      { secret: process.env.JWT_SECRET || 'dev_secret_change_me', expiresIn: (process.env.ACCESS_TTL || '30m') as any },
     );
   }
   signRefreshToken(user: any) {
@@ -41,9 +57,7 @@ export class AuthService {
     const { email, password } = body || {};
     const user = await this.validateUser(email, password);
     if (!user) throw new UnauthorizedException('Invalid credentials');
-    const access = this.signAccessToken(user);
-    const refresh = this.signRefreshToken(user);
-    this.setAuthCookies(res, access, refresh);
+    const { access, refresh } = await this.createSession(user, res);
     return { user };
   }
 
@@ -57,14 +71,17 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
     const user = { id: payload.sub, email: payload.email, role: payload.role };
-    const access = this.signAccessToken(user);
-    const refresh = this.signRefreshToken(user);
-    this.setAuthCookies(res, access, refresh);
+    await this.rotateTokens(user, res);
     return { user };
   }
 
   logout(res: any) {
     res.clearCookie('access_token', { path: '/' });
+    const r = res?.req?.cookies?.refresh_token;
+    if (r) {
+      const h = hashRefresh(r);
+      this.refreshRepo.update({ tokenHash: h }, { revokedAt: new Date() }).catch(() => void 0);
+    }
     res.clearCookie('refresh_token', { path: '/' });
     return { ok: true };
   }
@@ -76,14 +93,88 @@ export class AuthService {
   private setAuthCookies(res: any, access: string, refresh: string) {
     const isProd = (process.env.NODE_ENV || '').toLowerCase() === 'production';
     const common = { httpOnly: true, secure: isProd, sameSite: 'lax' as const, path: '/' };
-    res.cookie('access_token', access, { ...common, maxAge: parseDurationMs(process.env.ACCESS_TTL || '15m') });
+    res.cookie('access_token', access, { ...common, maxAge: parseDurationMs(process.env.ACCESS_TTL || '30m') });
     res.cookie('refresh_token', refresh, { ...common, maxAge: parseDurationMs(process.env.REFRESH_TTL || '7d') });
   }
 
-  // Minimal placeholder; replace with persistence as needed
+  private refreshExpiryDate(): Date {
+    const ms = parseDurationMs(process.env.REFRESH_TTL || '7d');
+    return new Date(Date.now() + ms);
+  }
+
+  async createSession(user: any, res: any) {
+    const access = this.signAccessToken(user);
+    const refresh = this.signRefreshToken(user);
+    const tokenHash = hashRefresh(refresh);
+    await this.refreshRepo.save(this.refreshRepo.create({
+      userId: user.id,
+      userRole: user.role,
+      tokenHash,
+      expiresAt: this.refreshExpiryDate(),
+      revokedAt: null,
+    }));
+    this.setAuthCookies(res, access, refresh);
+    return { access, refresh };
+  }
+
+  async rotateTokens(user: any, res: any, currentRecord?: RefreshToken) {
+    // Revoke current record if provided
+    if (currentRecord) {
+      await this.refreshRepo.update({ id: currentRecord.id }, { revokedAt: new Date() });
+    }
+    return this.createSession(user, res);
+  }
+
+  // Register a new patient user by default unless role provided explicitly
   async register(body: any) {
-    const { email } = body || {};
-    return { id: email, email };
+    const { email, password, role } = body || {};
+    if (!email || !password) throw new BadRequestException('email and password are required');
+    const exists = await this.userRepo.findOne({ where: { email } });
+    if (exists) throw new BadRequestException('Email already in use');
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await this.userRepo.save(this.userRepo.create({ email, passwordHash, role: (role || UserRole.Patient) }));
+    return { id: user.id, email: user.email, role: user.role };
+  }
+
+  async invite(body: any) {
+    const { email, type, role, staffId, patientId, expiresIn } = body || {};
+    if (!email) throw new BadRequestException('email required');
+    const existing = await this.userRepo.findOne({ where: { email } });
+    if (existing) throw new BadRequestException('User already exists with this email');
+    let assignedRole = role as UserRole | undefined;
+    if (type === 'patient') assignedRole = UserRole.Patient;
+    if (!assignedRole) throw new BadRequestException('role required');
+    if (assignedRole !== UserRole.Patient && !staffId && type !== 'staff') throw new BadRequestException('staffId required for staff');
+    const token = crypto.randomBytes(32).toString('hex');
+    const ttl = typeof expiresIn === 'string' ? parseDurationMs(expiresIn) : parseDurationMs('7d');
+    const expiresAt = new Date(Date.now() + ttl);
+    const inv = this.inviteRepo.create({ email, role: assignedRole, staffId: staffId || null, patientId: patientId || null, token, expiresAt, claimedAt: null, claimedByUserId: null });
+    const saved = await this.inviteRepo.save(inv);
+    return { invitationId: saved.id, token, expiresAt };
+  }
+
+  async acceptInvite(body: any, res: any) {
+    const { token, password } = body || {};
+    if (!token || !password) throw new BadRequestException('token and password required');
+    const inv = await this.inviteRepo.findOne({ where: { token } });
+    if (!inv) throw new BadRequestException('Invalid token');
+    if (inv.claimedAt) throw new BadRequestException('Invitation already claimed');
+    if (new Date(inv.expiresAt) < new Date()) throw new BadRequestException('Invitation expired');
+    const existing = await this.userRepo.findOne({ where: { email: inv.email } });
+    if (existing) throw new BadRequestException('User already exists with this email');
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await this.userRepo.save(this.userRepo.create({ email: inv.email, passwordHash, role: inv.role }));
+    if (inv.staffId) {
+      await this.staffRepo.update({ id: inv.staffId }, { user: { id: user.id } as any });
+    }
+    if (inv.patientId) {
+      await this.patientRepo.update({ id: inv.patientId }, { user: { id: user.id } as any });
+    }
+    await this.inviteRepo.update({ id: inv.id }, { claimedAt: new Date(), claimedByUserId: user.id });
+    const sub = inv.staffId || inv.patientId;
+    const sessionUser = { id: sub, email: user.email, role: user.role } as any;
+    await this.createSession(sessionUser, res);
+    return { user: sessionUser };
   }
 }
 

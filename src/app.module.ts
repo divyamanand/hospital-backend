@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
@@ -12,6 +12,10 @@ import { RoomModule } from './modules/room/room.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { SpecialtyModule } from './modules/specialty/specialty.module';
 import { RequirementModule } from './modules/requirement/requirement.module';
+import { AuthMiddleware } from './modules/auth/auth.middleware';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 @Module({
   imports: [
@@ -40,5 +44,13 @@ import { RequirementModule } from './modules/requirement/requirement.module';
     SpecialtyModule,
     RequirementModule,
   ],
+  providers: [
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
+    { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
+  ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(AuthMiddleware).forRoutes('*');
+  }
+}
