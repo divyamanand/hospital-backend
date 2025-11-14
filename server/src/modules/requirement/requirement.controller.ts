@@ -10,15 +10,15 @@ export class RequirementController {
   constructor(private readonly svc: RequirementService) {}
 
   @Post()
-  @Roles('admin','receptionist','inventory')
+  @Roles('admin','receptionist')
   create(@Body() body: any) { return this.svc.create(body); }
 
   @Get(':appointment_id')
-  @Roles('admin','receptionist','inventory')
+  @Roles('admin','receptionist','inventory','room_manager','doctor')
   byAppointment(@Param('appointment_id') appointmentId: string) { return this.svc.findByAppointment(appointmentId); }
 
   @Post(':id/fulfill')
-  @Roles('admin','receptionist','inventory')
+  @Roles('admin','receptionist','inventory','room_manager')
   fulfill(@Param('id') id: string, @Body() body: any) { return this.svc.fulfill(id, body); }
 
   // Staff allotment management
@@ -34,7 +34,7 @@ export class RequirementController {
 
   // Re-run suggestions on requirement update
   @Put(':id')
-  @Roles('admin','receptionist','inventory')
+  @Roles('admin','receptionist')
   updateRequirement(@Param('id') id: string, @Body() body: any) { return this.svc.updateRequirement(id, body); }
 
   // Allotment CRUD

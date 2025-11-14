@@ -42,4 +42,18 @@ export class PatientService {
     );
     return rows.map((r: any) => r.doctorId);
   }
+
+  async isDoctorLinkedToPatient(doctorId: string, patientId: string): Promise<boolean> {
+    if (!doctorId || !patientId) return false;
+    const appt = await this.repo.query(
+      'SELECT 1 FROM appointment WHERE patient_id = $1 AND doctor_id = $2 LIMIT 1',
+      [patientId, doctorId],
+    );
+    if (appt.length > 0) return true;
+    const rx = await this.repo.query(
+      'SELECT 1 FROM prescription WHERE patient_id = $1 AND doctor_id = $2 LIMIT 1',
+      [patientId, doctorId],
+    );
+    return rx.length > 0;
+  }
 }

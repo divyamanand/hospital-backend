@@ -26,7 +26,7 @@ export class RoomController {
   remove(@Param('id') id: string) { return this.svc.remove(id); }
 
   @Post(':id/book')
-  @Roles('admin','room_manager')
+  @Roles('admin','room_manager','receptionist')
   book(@Param('id') id: string, @Body() body: any) { return this.svc.book(id, body); }
 
   @Post(':id/status')
@@ -34,6 +34,6 @@ export class RoomController {
   changeStatus(@Param('id') id: string, @Body() body: { status: string }) { return this.svc.changeStatus(id, body.status as any); }
 
   @Get('available/list')
-  @Roles('admin','room_manager')
+  @Roles('admin','room_manager','receptionist','patient')
   available(@Query('type') type?: string) { return this.svc.findAvailable(type as any); }
 }

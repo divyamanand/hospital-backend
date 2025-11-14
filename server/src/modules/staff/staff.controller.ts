@@ -10,12 +10,22 @@ import { Roles } from '../auth/roles.decorator';
 export class StaffController {
   constructor(private svc: StaffService) {}
   @Get()
-  @Roles('admin')
-  list() { return this.svc.findAll(); }
+  @Roles('admin','receptionist')
+  list(@Req() req: any) {
+    const role = req.user?.role;
+    return this.svc.findAll().then(rows => {
+      if (role === 'receptionist') return rows.filter(r => r.role !== 'admin');
+      return rows;
+    });
+  }
   @Get(':id')
   get(@Param('id') id: string, @Req() req: any) {
-    const role = req.user?.role; const sub = req.user?.id;
-    if (role === 'admin' || sub === id) return this.svc.findOne(id);
+    const role = req.user?.role; const userStaffId = req.user?.staffId; // assuming mapped
+    if (role === 'admin') return this.svc.findOne(id);
+    if (role === 'receptionist') {
+      return this.svc.findOne(id).then(s => { if (s.role === 'admin') throw new ForbiddenException('Not allowed'); return s; });
+    }
+    if (['doctor','inventory','pharmacist','room_manager'].includes(role) && userStaffId === id) return this.svc.findOne(id);
     throw new ForbiddenException('Not allowed');
   }
   @Post()
@@ -24,8 +34,15 @@ export class StaffController {
 
   @Put(':id')
   update(@Param('id') id: string, @Body() body: any, @Req() req: any) {
-    const role = req.user?.role; const sub = req.user?.id;
-    if (role === 'admin' || sub === id) return this.svc.update(id, body);
+    const role = req.user?.role; const userStaffId = req.user?.staffId;
+    if (role === 'admin') return this.svc.update(id, body);
+    if (role === 'receptionist') return this.svc.update(id, body); // service layer should reject admin edits
+    if (['doctor','inventory','pharmacist','room_manager'].includes(role) && userStaffId === id) {
+      const limited: any = {};
+      if (body.phone) limited.phone = body.phone;
+      if (body.notes) limited.notes = body.notes;
+      return this.svc.update(id, limited);
+    }
     throw new ForbiddenException('Not allowed');
   }
 

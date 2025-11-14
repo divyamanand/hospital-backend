@@ -10,6 +10,7 @@ export class AppointmentController {
   constructor(private svc: AppointmentService) {}
   @Get()
   @UseGuards(RolesGuard)
+  @Roles('admin','receptionist','doctor','patient')
   list(@Query() q: any, @Req() req: any) {
     const role = req.user?.role;
     const sub = req.user?.id;
@@ -30,6 +31,7 @@ export class AppointmentController {
   }
   @Post()
   @UseGuards(RolesGuard)
+  @Roles('admin','receptionist','doctor','patient')
   createOrBook(@Body() body: any, @Req() req: any) {
     const role = req.user?.role; const sub = req.user?.id;
     if (role === 'patient') {
@@ -47,14 +49,20 @@ export class AppointmentController {
   }
 
   @Post('findMatchingDoctorsForIssues')
+  @UseGuards(RolesGuard)
+  @Roles('admin','receptionist','doctor','patient')
   findMatchingDoctors(@Body() body: { issues: string[]; timeWindow?: any; appointment_type?: string }) {
     return this.svc.findMatchingDoctorsForIssues(body);
   }
 
   @Get('doctor/:doctorId/next3Slots')
-  nextSlots(@Param('doctorId') doctorId: string) { return this.svc.getDoctorNext3Slots(doctorId); }
+  @UseGuards(RolesGuard)
+  @Roles('admin','receptionist','doctor')
+  nextSlots(@Param('doctorId') doctorId: string, @Req() req: any) { return this.svc.getDoctorNext3Slots(doctorId); }
 
   @Put(':id')
+  @UseGuards(RolesGuard)
+  @Roles('admin','receptionist','doctor','patient')
   async update(@Param('id') id: string, @Body() body: any, @Req() req: any) {
     const appt = await this.svc.findOne(id);
     const role = req.user?.role; const sub = req.user?.id;
@@ -66,11 +74,20 @@ export class AppointmentController {
   }
 
   @Post(':id/cancel')
-  cancelWithReason(@Param('id') id: string, @Body() body: { reason?: string }) {
-    return this.svc.cancel(id, body?.reason);
+  @UseGuards(RolesGuard)
+  @Roles('admin','receptionist','patient')
+  async cancelWithReason(@Param('id') id: string, @Body() body: { reason?: string }, @Req() req: any) {
+    const appt = await this.svc.findOne(id);
+    const role = req.user?.role; const sub = req.user?.id;
+    if (!appt) return appt;
+    if (role === 'admin' || role === 'receptionist') return this.svc.cancel(id, body?.reason);
+    if (role === 'patient' && (appt.patient as any)?.id === sub) return this.svc.cancel(id, body?.reason);
+    throw new ForbiddenException('Not allowed');
   }
 
   @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles('admin','receptionist','patient')
   async cancel(@Param('id') id: string, @Req() req: any) {
     const appt = await this.svc.findOne(id);
     const role = req.user?.role; const sub = req.user?.id;
@@ -82,15 +99,25 @@ export class AppointmentController {
   }
 
   @Put(':id/patch')
-  patch(@Param('id') id: string, @Body() body: any) { return this.svc.update(id, body); }
+  @UseGuards(RolesGuard)
+  @Roles('admin','receptionist','doctor')
+  patch(@Param('id') id: string, @Body() body: any, @Req() req: any) { return this.svc.update(id, body); }
 
   @Delete(':id/hard')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
   hardDelete(@Param('id') id: string) { return this.svc.remove(id); }
 
   @Post(':id/confirm')
-  confirm(@Param('id') id: string) { return this.svc.transition(id, 'confirm'); }
+  @UseGuards(RolesGuard)
+  @Roles('admin','receptionist','doctor')
+  confirm(@Param('id') id: string, @Req() req: any) { return this.svc.transition(id, 'confirm'); }
   @Post(':id/checkin')
-  checkin(@Param('id') id: string) { return this.svc.transition(id, 'checkin'); }
+  @UseGuards(RolesGuard)
+  @Roles('admin','receptionist','doctor')
+  checkin(@Param('id') id: string, @Req() req: any) { return this.svc.transition(id, 'checkin'); }
   @Post(':id/complete')
-  complete(@Param('id') id: string) { return this.svc.transition(id, 'complete'); }
+  @UseGuards(RolesGuard)
+  @Roles('admin','receptionist','doctor')
+  complete(@Param('id') id: string, @Req() req: any) { return this.svc.transition(id, 'complete'); }
 }

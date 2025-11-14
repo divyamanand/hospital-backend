@@ -16,8 +16,15 @@ export class PatientController {
   list() { return this.svc.findAll(); }
 
   @Get(':id')
-  @UseGuards(RolesGuard, PatientOrDoctorGuard)
-  get(@Param('id') id: string) { return this.svc.findOne(id); }
+  @UseGuards(RolesGuard)
+  @Roles('admin','receptionist','doctor','patient')
+  async get(@Param('id') id: string, @Req() req: any) {
+    const role = req.user?.role;
+    if (role === 'admin' || role === 'receptionist') return this.svc.findOne(id);
+    if (role === 'patient' && req.user?.patientId === id) return this.svc.findOne(id);
+    if (role === 'doctor' && await this.svc.isDoctorLinkedToPatient(req.user?.staffId, id)) return this.svc.findOne(id);
+    throw new ForbiddenException('Not allowed');
+  }
 
   @Post()
   @UseGuards(RolesGuard)
@@ -25,10 +32,28 @@ export class PatientController {
   create(@Body() body: any) { return this.svc.create(body); }
 
   @Put(':id')
-  @UseGuards(RolesGuard, PatientOrDoctorGuard)
-  update(@Param('id') id: string, @Body() body: any) { return this.svc.update(id, body); }
+  @UseGuards(RolesGuard)
+  @Roles('admin','receptionist','patient')
+  async update(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    const role = req.user?.role;
+    if (role === 'admin' || role === 'receptionist') return this.svc.update(id, body);
+    if (role === 'patient' && req.user?.patientId === id) {
+      const limited: any = {};
+      if (body.phone) limited.phone = body.phone;
+      if (body.insurance) limited.insurance = body.insurance;
+      return this.svc.update(id, limited);
+    }
+    throw new ForbiddenException('Not allowed');
+  }
 
   @Get(':id/doctors-from-prescription')
-  @UseGuards(RolesGuard, PatientOrDoctorGuard)
-  doctorsFromPrescription(@Param('id') id: string) { return this.svc.getDoctorsFromPrescriptions(id); }
+  @UseGuards(RolesGuard)
+  @Roles('admin','receptionist','doctor','patient')
+  async doctorsFromPrescription(@Param('id') id: string, @Req() req: any) {
+    const role = req.user?.role;
+    if (role === 'admin' || role === 'receptionist') return this.svc.getDoctorsFromPrescriptions(id);
+    if (role === 'patient' && req.user?.patientId === id) return this.svc.getDoctorsFromPrescriptions(id);
+    if (role === 'doctor' && await this.svc.isDoctorLinkedToPatient(req.user?.staffId, id)) return this.svc.getDoctorsFromPrescriptions(id);
+    throw new ForbiddenException('Not allowed');
+  }
 }
