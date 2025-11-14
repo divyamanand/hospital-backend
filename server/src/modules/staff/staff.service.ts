@@ -89,7 +89,7 @@ export class StaffService {
     await this.timingsRepo.createQueryBuilder()
       .update(Timings)
       .set(data)
-      .where('id = :id AND staff_id = :sid', { id: timingId, sid: staffId })
+      .where('id = :id AND staffId = :sid', { id: timingId, sid: staffId })
       .execute();
     return this.getTimingById(staffId, timingId);
   }
@@ -98,7 +98,7 @@ export class StaffService {
     await this.timingsRepo.createQueryBuilder()
       .delete()
       .from(Timings)
-      .where('id = :id AND staff_id = :sid', { id: timingId, sid: staffId })
+      .where('id = :id AND staffId = :sid', { id: timingId, sid: staffId })
       .execute();
     return { id: timingId, removed: true } as any;
   }
@@ -116,7 +116,7 @@ export class StaffService {
     await this.leaveRepo.createQueryBuilder()
       .update(Leave)
       .set(data)
-      .where('id = :id AND staff_id = :sid', { id: leaveId, sid: staffId })
+      .where('id = :id AND staffId = :sid', { id: leaveId, sid: staffId })
       .execute();
     return this.getLeaveById(staffId, leaveId);
   }
@@ -125,7 +125,7 @@ export class StaffService {
     await this.leaveRepo.createQueryBuilder()
       .delete()
       .from(Leave)
-      .where('id = :id AND staff_id = :sid', { id: leaveId, sid: staffId })
+      .where('id = :id AND staffId = :sid', { id: leaveId, sid: staffId })
       .execute();
     return { id: leaveId, removed: true } as any;
   }

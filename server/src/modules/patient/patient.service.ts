@@ -45,9 +45,8 @@ export class PatientService {
   }
 
   async getDoctorsFromPrescriptions(patientId: string) {
-    // Basic query using raw SQL for distinct doctor ids from prescriptions
     const rows = await this.repo.query(
-      `SELECT DISTINCT p.doctor_id as "doctorId" FROM prescription p WHERE p.patient_id = $1 AND p.doctor_id IS NOT NULL`,
+      `SELECT DISTINCT p.doctorId as "doctorId" FROM prescription p WHERE p.patientId = $1 AND p.doctorId IS NOT NULL`,
       [patientId],
     );
     return rows.map((r: any) => r.doctorId);
@@ -56,12 +55,12 @@ export class PatientService {
   async isDoctorLinkedToPatient(doctorId: string, patientId: string): Promise<boolean> {
     if (!doctorId || !patientId) return false;
     const appt = await this.repo.query(
-      'SELECT 1 FROM appointment WHERE patient_id = $1 AND doctor_id = $2 LIMIT 1',
+      'SELECT 1 FROM appointment WHERE patientId = $1 AND doctorId = $2 LIMIT 1',
       [patientId, doctorId],
     );
     if (appt.length > 0) return true;
     const rx = await this.repo.query(
-      'SELECT 1 FROM prescription WHERE patient_id = $1 AND doctor_id = $2 LIMIT 1',
+      'SELECT 1 FROM prescription WHERE patientId = $1 AND doctorId = $2 LIMIT 1',
       [patientId, doctorId],
     );
     return rx.length > 0;

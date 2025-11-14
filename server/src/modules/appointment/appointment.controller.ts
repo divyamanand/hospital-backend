@@ -14,9 +14,14 @@ export class AppointmentController {
   list(@Query() q: any, @Req() req: any) {
     const role = req.user?.role;
     const sub = req.user?.id;
-    const filter = { ...(q || {}) };
-    if (role === 'patient') filter.patient_id = sub;
-    if (role === 'doctor') filter.doctor_id = sub;
+    const filter: any = {};
+    if (q?.status) filter.status = q.status;
+    if (q?.doctorId) filter.doctorId = q.doctorId;
+    if (q?.patientId) filter.patientId = q.patientId;
+    if (q?.from) filter.from = q.from;
+    if (q?.to) filter.to = q.to;
+    if (role === 'patient') filter.patientId = sub;
+    if (role === 'doctor') filter.doctorId = sub;
     return this.svc.findAll(filter);
   }
   @Get(':id')
@@ -34,18 +39,18 @@ export class AppointmentController {
   @Roles('admin','receptionist','doctor','patient')
   createOrBook(@Body() body: any, @Req() req: any) {
     const role = req.user?.role; const sub = req.user?.id;
-    if (role === 'patient') {
-      const pid = (body?.patient?.id) || body?.patient_id;
-      if (pid && pid !== sub) throw new ForbiddenException('Patients can only book for self');
-      body.patient = { id: sub };
-    }
-    if (role === 'doctor') {
-      // Ensure doctor is self
-      const did = (body?.doctor?.id) || body?.doctor_id;
-      if (did && did !== sub) throw new ForbiddenException('Doctors can only book their own slots');
-      body.doctor = { id: sub };
-    }
-    return this.svc.book(body);
+    const patientIdInput = body.patientId || body.patient_id || body.patient?.id;
+    const doctorIdInput = body.doctorId || body.doctor_id || body.doctor?.id;
+    const startAt = body.startAt;
+    const endAt = body.endAt;
+    if (role === 'patient' && patientIdInput && patientIdInput !== sub) throw new ForbiddenException('Patients can only book for self');
+    if (role === 'doctor' && doctorIdInput && doctorIdInput !== sub) throw new ForbiddenException('Doctors can only book their own slots');
+    const patientId = role === 'patient' ? sub : patientIdInput;
+    const doctorId = role === 'doctor' ? sub : doctorIdInput;
+    if (!patientId) throw new ForbiddenException('patientId required');
+    if (!doctorId) throw new ForbiddenException('doctorId required');
+    if (!startAt || !endAt) throw new ForbiddenException('startAt and endAt required');
+    return this.svc.book({ patient: { id: patientId } as any, doctor: { id: doctorId } as any, startAt, endAt });
   }
 
   @Post('findMatchingDoctorsForIssues')

@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException, BadRequestException, ForbiddenExcept
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Staff, StaffRole, StaffStatus, WorkType } from '../../entities/staff.entity';
+import { Staff } from '../../entities/staff.entity';
 import { Patient } from '../../entities/patient.entity';
 import { RefreshToken } from '../../entities/refresh-token.entity';
 import { hashRefresh } from './refresh.util';
@@ -29,21 +29,15 @@ export class AuthService {
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return null;
     // Determine domain id for token subject by user.type (fallback to role)
-    let isPatientType: boolean;
-    if ((user as any).type) {
-      isPatientType = ((user as any).type === UserType.Patient) && user.role === UserRole.Patient;
-    } else {
-      isPatientType = user.role === UserRole.Patient;
-    }
+    const isPatientType = user.role === UserRole.Patient;
     if (isPatientType) {
       const patient = await this.patientRepo.findOne({ where: { user: { id: user.id } as any } });
       if (!patient) return null;
-      return { id: patient.id, email: user.email, role: user.role, userType: UserType.Patient };
-    } else {
-      const staff = await this.staffRepo.findOne({ where: { user: { id: user.id } as any } });
-      if (!staff) return null;
-      return { id: staff.id, email: user.email, role: user.role, userType: UserType.Staff };
+      return { id: user.id, email: user.email, role: user.role, userType: UserType.Patient, patientId: patient.id };
     }
+    const staff = await this.staffRepo.findOne({ where: { user: { id: user.id } as any } });
+    if (!staff) return null;
+    return { id: user.id, email: user.email, role: user.role, userType: UserType.Staff, staffId: staff.id };
   }
 
   signAccessToken(user: any) {
@@ -64,7 +58,7 @@ export class AuthService {
     const user = await this.validateUser(email, password);
     if (!user) throw new UnauthorizedException('Invalid credentials');
     const { access, refresh } = await this.createSession(user, res);
-    return { user };
+    return { user, accessExpires: new Date(Date.now() + parseDurationMs(process.env.ACCESS_TTL || '30m')) };
   }
 
   async refreshCookie(req: any, res: any) {
@@ -76,9 +70,19 @@ export class AuthService {
     } catch (e) {
       throw new UnauthorizedException('Invalid refresh token');
     }
-    const user = { id: payload.sub, email: payload.email, role: payload.role, userType: payload.userType || (payload.role === UserRole.Patient ? UserType.Patient : UserType.Staff) };
-    await this.rotateTokens(user, res);
-    return { user };
+    const baseUser = await this.userRepo.findOne({ where: { id: payload.sub } });
+    if (!baseUser) throw new UnauthorizedException('User not found');
+    const isPatient = baseUser.role === UserRole.Patient;
+    let enriched: any = { id: baseUser.id, email: baseUser.email, role: baseUser.role, userType: isPatient ? UserType.Patient : UserType.Staff };
+    if (isPatient) {
+      const patient = await this.patientRepo.findOne({ where: { user: { id: baseUser.id } as any } });
+      if (patient) enriched.patientId = patient.id;
+    } else {
+      const staff = await this.staffRepo.findOne({ where: { user: { id: baseUser.id } as any } });
+      if (staff) enriched.staffId = staff.id;
+    }
+    await this.rotateTokens(enriched, res);
+    return { user: enriched, accessExpires: new Date(Date.now() + parseDurationMs(process.env.ACCESS_TTL || '30m')) };
   }
 
   logout(res: any) {
@@ -180,10 +184,11 @@ export class AuthService {
       await this.patientRepo.update({ id: inv.patientId }, { user: { id: user.id } as any });
     }
     await this.inviteRepo.update({ id: inv.id }, { claimedAt: new Date(), claimedByUserId: user.id });
-    const sub = inv.staffId || inv.patientId;
-    const sessionUser = { id: sub, email: user.email, role: user.role, userType } as any;
+    let sessionUser: any = { id: user.id, email: user.email, role: user.role, userType };
+    if (inv.staffId) sessionUser.staffId = inv.staffId;
+    if (inv.patientId) sessionUser.patientId = inv.patientId;
     await this.createSession(sessionUser, res);
-    return { user: sessionUser };
+    return { user: sessionUser, accessExpires: new Date(Date.now() + parseDurationMs(process.env.ACCESS_TTL || '30m')) };
   }
 
   async bootstrapAdmin(body: any, res: any) {
@@ -202,20 +207,11 @@ export class AuthService {
     if (existing) throw new BadRequestException('Email already in use');
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const user = await this.userRepo.save(this.userRepo.create({ email, passwordHash, role: UserRole.Admin, type: UserType.Staff } as Partial<User>));
-
-    await this.staffRepo.save(this.staffRepo.create({
-      user: { id: user.id } as any,
-      role: StaffRole.Admin,
-      firstName,
-      lastName,
-      status: StaffStatus.Active,
-      workType: WorkType.FullTime,
-    } as any));
-    const createdStaff = await this.staffRepo.findOne({ where: { user: { id: user.id } as any } });
-    const sessionUser = { id: createdStaff?.id, email: user.email, role: UserRole.Admin, userType: UserType.Staff } as any;
+    const user = await this.userRepo.save(this.userRepo.create({ email, passwordHash, role: UserRole.Admin, type: UserType.Staff, firstName, lastName } as Partial<User>));
+    const staff = await this.staffRepo.save(this.staffRepo.create({ user: { id: user.id } as any }));
+    const sessionUser = { id: user.id, email: user.email, role: user.role, userType: UserType.Staff, staffId: staff.id } as any;
     await this.createSession(sessionUser, res);
-    return { user: { id: user.id, email: user.email, role: user.role }, staff: { id: createdStaff?.id, firstName, lastName } };
+    return { user: sessionUser };
   }
 }
 

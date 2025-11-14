@@ -22,8 +22,8 @@ export class AppointmentService {
   findAll(filter?: any) {
     const qb = this.repo.createQueryBuilder('a').leftJoinAndSelect('a.patient','patient').leftJoinAndSelect('a.doctor','doctor');
     qb.where('1=1');
-    if (filter?.patient_id) qb.andWhere('a.patientId = :pid', { pid: filter.patient_id });
-    if (filter?.doctor_id) qb.andWhere('a.doctorId = :did', { did: filter.doctor_id });
+    if (filter?.patientId) qb.andWhere('a.patientId = :pid', { pid: filter.patientId });
+    if (filter?.doctorId) qb.andWhere('a.doctorId = :did', { did: filter.doctorId });
     if (filter?.status) qb.andWhere('a.status = :st', { st: filter.status });
     if (filter?.from) qb.andWhere('a.startAt >= :from', { from: filter.from });
     if (filter?.to) qb.andWhere('a.startAt <= :to', { to: filter.to });
