@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { InventoryItem, InventoryStatus } from '../../entities/inventory-item.entity';
-import { InventoryTransaction, InventoryChangeReason } from '../../entities/inventory-transaction.entity';
+import { InventoryItem } from '../../entities/inventory-item.entity';
+import { InventoryTransaction } from '../../entities/inventory-transaction.entity';
 import { Prescription } from '../../entities/prescription.entity';
 import { PrescriptionItem } from '../../entities/prescription-item.entity';
 
@@ -30,16 +30,17 @@ export class InventoryService {
   async addStock(id: string, quantity: number, referenceId?: string) {
     const item = await this.itemRepo.findOne({ where: { id } });
     if (!item || quantity <= 0) return null;
-    await this.txnRepo.save(this.txnRepo.create({ inventoryItem: item, change: quantity, reason: InventoryChangeReason.Purchase, referenceId: referenceId || null }));
-    await this.itemRepo.update({ id }, { quantityOnHand: (item.quantityOnHand || 0) + quantity });
+    await this.txnRepo.save(this.txnRepo.create({ inventoryItem: item, type: 'in', quantity, reason: referenceId || null, refPrescriptionItemId: null }));
+    await this.itemRepo.update({ id }, { quantity: (item.quantity || 0) + quantity });
     return this.itemRepo.findOne({ where: { id } });
   }
 
   async dispenseItem(id: string, quantity: number, referenceId?: string) {
     const item = await this.itemRepo.findOne({ where: { id } });
     if (!item || quantity <= 0) return null;
-    await this.txnRepo.save(this.txnRepo.create({ inventoryItem: item, change: -Math.abs(quantity), reason: InventoryChangeReason.Use, referenceId: referenceId || null }));
-    await this.itemRepo.update({ id }, { quantityOnHand: (item.quantityOnHand || 0) - Math.abs(quantity) });
+    const qty = Math.abs(quantity);
+    await this.txnRepo.save(this.txnRepo.create({ inventoryItem: item, type: 'out', quantity: qty, reason: referenceId || null, refPrescriptionItemId: null }));
+    await this.itemRepo.update({ id }, { quantity: (item.quantity || 0) - qty });
     return this.itemRepo.findOne({ where: { id } });
   }
 
@@ -47,7 +48,7 @@ export class InventoryService {
     const today = new Date();
     const iso = today.toISOString().slice(0,10);
     const expired = await this.itemRepo.createQueryBuilder('i')
-      .where('i.expiry_date IS NOT NULL AND i.expiry_date < :today', { today: iso })
+      .where('i.expiry IS NOT NULL AND i.expiry < :today', { today: iso })
       .getMany();
     const ids = expired.map(e => e.id);
     if (ids.length === 0) return { removed: 0 } as any;
@@ -55,35 +56,18 @@ export class InventoryService {
     return { removed: ids.length, ids } as any;
   }
 
-  async adjustItem(id: string, body: { change: number; reason: string; referenceId?: string }) {
+  async adjustItem(id: string, body: { quantity: number; reason?: string; refPrescriptionItemId?: string }) {
     const item = await this.itemRepo.findOne({ where: { id } });
     if (!item) return null;
     await this.txnRepo.save(this.txnRepo.create({
       inventoryItem: item,
-      change: body.change,
-      reason: body.reason as InventoryChangeReason,
-      referenceId: body.referenceId || null,
+      type: 'adjust',
+      quantity: body.quantity,
+      reason: body.reason || null,
+      refPrescriptionItemId: body.refPrescriptionItemId || null,
     }));
-    await this.itemRepo.update({ id }, { quantityOnHand: (item.quantityOnHand || 0) + body.change });
+    await this.itemRepo.update({ id }, { quantity: (item.quantity || 0) + body.quantity });
     return this.itemRepo.findOne({ where: { id } });
   }
-
-  async fulfillPrescription(prescriptionId: string) {
-    // naive: mark items fulfilled and create txns
-    const pres = await this.presRepo.findOne({ where: { id: prescriptionId }, relations: ['items','items.inventoryItem'] });
-    if (!pres) return null;
-    for (const item of pres.items || []) {
-      if (item.quantity && !item.fulfilled && item.inventoryItem) {
-        await this.txnRepo.save(this.txnRepo.create({
-          inventoryItem: item.inventoryItem,
-          change: -Math.abs(item.quantity),
-          reason: InventoryChangeReason.PrescriptionFulfill,
-          referenceId: item.id,
-        }));
-        await this.presItemRepo.update({ id: item.id }, { fulfilled: true, fulfilledAt: new Date() });
-        await this.itemRepo.update({ id: item.inventoryItem.id }, { quantityOnHand: (item.inventoryItem.quantityOnHand || 0) - Math.abs(item.quantity) });
-      }
-    }
-    return this.presRepo.findOne({ where: { id: prescriptionId }, relations: ['items'] });
-  }
+  // Prescription fulfillment moved to prescription flow with explicit mapping in new schema
 }

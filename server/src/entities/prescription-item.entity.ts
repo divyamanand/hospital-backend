@@ -1,6 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { Prescription } from './prescription.entity';
-import { InventoryItem } from './inventory-item.entity';
 
 @Entity({ name: 'prescription_item' })
 export class PrescriptionItem {
@@ -11,31 +10,21 @@ export class PrescriptionItem {
   @JoinColumn({ name: 'prescription_id' })
   prescription!: Prescription;
 
-  @ManyToOne(() => InventoryItem, { nullable: true })
-  @JoinColumn({ name: 'inventory_item_id' })
-  inventoryItem!: InventoryItem | null;
-
   @Column()
-  medicineName!: string;
+  name!: string;
 
   @Column()
   dosage!: string; // e.g., 500mg
 
   @Column()
-  frequency!: string; // e.g., twice daily
+  duration!: string; // e.g., 5 days
 
   @Column({ type: 'int' })
-  durationDays!: number;
+  quantity!: number;
 
-  @Column({ type: 'int', nullable: true })
-  quantity!: number | null;
+  @Column({ type: 'varchar', nullable: true })
+  dayDivide!: string | null; // e.g., 101, 001, 111
 
-  @Column({ type: 'text', nullable: true })
-  instructions!: string | null;
-
-  @Column({ type: 'boolean', default: false })
-  fulfilled!: boolean;
-
-  @Column({ type: 'timestamp', nullable: true })
-  fulfilledAt!: Date | null;
+  @Column({ type: 'varchar', nullable: true })
+  method!: string | null; // before food | after food
 }

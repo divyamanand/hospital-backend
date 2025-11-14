@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Patient } from '../../entities/patient.entity';
-import { User, UserRole } from '../../entities/user.entity';
+import { User, UserRole, UserType } from '../../entities/user.entity';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -13,21 +13,31 @@ export class PatientService {
   ) {}
 
   async create(data: any) {
-    const { email, password, ...rest } = data || {};
+    const { email, password, firstName, lastName, dateOfBirth, gender, phone, primaryPhysicianId } = data || {};
     if (email && password) {
       const exists = await this.userRepo.findOne({ where: { email } });
       if (exists) throw new Error('Email already in use');
       const passwordHash = await bcrypt.hash(password, 10);
-      const user = await this.userRepo.save(this.userRepo.create({ email, passwordHash, role: UserRole.Patient }));
-      const patient = this.repo.create({ ...rest, user: { id: user.id } as any });
+      const user = await this.userRepo.save(this.userRepo.create({
+        email,
+        passwordHash,
+        role: UserRole.Patient,
+        type: UserType.Patient,
+        firstName: firstName ?? null,
+        lastName: lastName ?? null,
+        dateOfBirth: dateOfBirth ?? null,
+        gender: gender ?? null,
+        phone: phone ?? null,
+      } as Partial<User>));
+      const patient = this.repo.create({ user: { id: user.id } as any, primaryPhysician: primaryPhysicianId ? ({ id: primaryPhysicianId } as any) : null });
       return this.repo.save(patient);
     }
     // Create patient profile only; invite later to set password
-    const patient = this.repo.create({ ...rest });
+    const patient = this.repo.create({ primaryPhysician: primaryPhysicianId ? ({ id: primaryPhysicianId } as any) : null });
     return this.repo.save(patient);
   }
-  findAll() { return this.repo.find(); }
-  findOne(id: string) { return this.repo.findOne({ where: { id } }); }
+  findAll() { return this.repo.find({ relations: ['user','primaryPhysician'] }); }
+  findOne(id: string) { return this.repo.findOne({ where: { id }, relations: ['user','primaryPhysician'] }); }
 
   async update(id: string, data: Partial<Patient>) {
     await this.repo.update({ id }, data);

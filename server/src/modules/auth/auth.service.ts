@@ -6,7 +6,7 @@ import { Staff, StaffRole, StaffStatus, WorkType } from '../../entities/staff.en
 import { Patient } from '../../entities/patient.entity';
 import { RefreshToken } from '../../entities/refresh-token.entity';
 import { hashRefresh } from './refresh.util';
-import { User, UserRole } from '../../entities/user.entity';
+import { User, UserRole, UserType } from '../../entities/user.entity';
 import { Invitation } from '../../entities/invitation.entity';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
@@ -28,27 +28,33 @@ export class AuthService {
     if (!user) return null;
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return null;
-    // Determine domain id for token subject
-    if (user.role === UserRole.Patient) {
+    // Determine domain id for token subject by user.type (fallback to role)
+    let isPatientType: boolean;
+    if ((user as any).type) {
+      isPatientType = ((user as any).type === UserType.Patient) && user.role === UserRole.Patient;
+    } else {
+      isPatientType = user.role === UserRole.Patient;
+    }
+    if (isPatientType) {
       const patient = await this.patientRepo.findOne({ where: { user: { id: user.id } as any } });
       if (!patient) return null;
-      return { id: patient.id, email: user.email, role: user.role };
+      return { id: patient.id, email: user.email, role: user.role, userType: UserType.Patient };
     } else {
       const staff = await this.staffRepo.findOne({ where: { user: { id: user.id } as any } });
       if (!staff) return null;
-      return { id: staff.id, email: user.email, role: user.role };
+      return { id: staff.id, email: user.email, role: user.role, userType: UserType.Staff };
     }
   }
 
   signAccessToken(user: any) {
     return this.jwt.sign(
-      { sub: user.id, email: user.email, role: user.role, type: 'access' },
+      { sub: user.id, email: user.email, role: user.role, userType: user.userType, type: 'access' },
       { secret: process.env.JWT_SECRET || 'dev_secret_change_me', expiresIn: (process.env.ACCESS_TTL || '30m') as any },
     );
   }
   signRefreshToken(user: any) {
     return this.jwt.sign(
-      { sub: user.id, email: user.email, role: user.role, type: 'refresh' },
+      { sub: user.id, email: user.email, role: user.role, userType: user.userType, type: 'refresh' },
       { secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'dev_secret_change_me', expiresIn: (process.env.REFRESH_TTL || '7d') as any },
     );
   }
@@ -70,7 +76,7 @@ export class AuthService {
     } catch (e) {
       throw new UnauthorizedException('Invalid refresh token');
     }
-    const user = { id: payload.sub, email: payload.email, role: payload.role };
+    const user = { id: payload.sub, email: payload.email, role: payload.role, userType: payload.userType || (payload.role === UserRole.Patient ? UserType.Patient : UserType.Staff) };
     await this.rotateTokens(user, res);
     return { user };
   }
@@ -132,7 +138,9 @@ export class AuthService {
     const exists = await this.userRepo.findOne({ where: { email } });
     if (exists) throw new BadRequestException('Email already in use');
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await this.userRepo.save(this.userRepo.create({ email, passwordHash, role: (role || UserRole.Patient) }));
+    const assignedRole: UserRole = role || UserRole.Patient;
+    const assignedType: UserType = assignedRole === UserRole.Patient ? UserType.Patient : UserType.Staff;
+    const user = await this.userRepo.save(this.userRepo.create({ email, passwordHash, role: assignedRole, type: assignedType } as Partial<User>));
     return { id: user.id, email: user.email, role: user.role };
   }
 
@@ -163,7 +171,8 @@ export class AuthService {
     const existing = await this.userRepo.findOne({ where: { email: inv.email } });
     if (existing) throw new BadRequestException('User already exists with this email');
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await this.userRepo.save(this.userRepo.create({ email: inv.email, passwordHash, role: inv.role }));
+    const userType = inv.role === UserRole.Patient ? UserType.Patient : UserType.Staff;
+    const user = await this.userRepo.save(this.userRepo.create({ email: inv.email, passwordHash, role: inv.role, type: userType } as Partial<User>));
     if (inv.staffId) {
       await this.staffRepo.update({ id: inv.staffId }, { user: { id: user.id } as any });
     }
@@ -172,7 +181,7 @@ export class AuthService {
     }
     await this.inviteRepo.update({ id: inv.id }, { claimedAt: new Date(), claimedByUserId: user.id });
     const sub = inv.staffId || inv.patientId;
-    const sessionUser = { id: sub, email: user.email, role: user.role } as any;
+    const sessionUser = { id: sub, email: user.email, role: user.role, userType } as any;
     await this.createSession(sessionUser, res);
     return { user: sessionUser };
   }
@@ -193,7 +202,7 @@ export class AuthService {
     if (existing) throw new BadRequestException('Email already in use');
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const user = await this.userRepo.save(this.userRepo.create({ email, passwordHash, role: UserRole.Admin }));
+    const user = await this.userRepo.save(this.userRepo.create({ email, passwordHash, role: UserRole.Admin, type: UserType.Staff } as Partial<User>));
 
     await this.staffRepo.save(this.staffRepo.create({
       user: { id: user.id } as any,
@@ -204,7 +213,7 @@ export class AuthService {
       workType: WorkType.FullTime,
     } as any));
     const createdStaff = await this.staffRepo.findOne({ where: { user: { id: user.id } as any } });
-    const sessionUser = { id: createdStaff?.id, email: user.email, role: UserRole.Admin } as any;
+    const sessionUser = { id: createdStaff?.id, email: user.email, role: UserRole.Admin, userType: UserType.Staff } as any;
     await this.createSession(sessionUser, res);
     return { user: { id: user.id, email: user.email, role: user.role }, staff: { id: createdStaff?.id, firstName, lastName } };
   }

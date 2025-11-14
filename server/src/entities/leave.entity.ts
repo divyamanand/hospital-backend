@@ -1,12 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Staff } from './staff.entity';
 
-export enum LeaveStatus {
-  Approved = 'approved',
-  Pending = 'pending',
-  Rejected = 'rejected',
-}
-
 @Entity({ name: 'leave' })
 export class Leave {
   @PrimaryGeneratedColumn('uuid')
@@ -16,20 +10,20 @@ export class Leave {
   @JoinColumn({ name: 'staff_id' })
   staff!: Staff;
 
-  @Column({ type: 'timestamp' })
-  startDatetime!: Date;
+  @Column({ type: 'date' })
+  startDate!: string;
 
-  @Column({ type: 'timestamp' })
-  endDatetime!: Date;
+  @Column({ type: 'date' })
+  endDate!: string;
 
   @Column({ type: 'text', nullable: true })
   reason!: string | null;
 
-  @Column({ type: 'enum', enum: LeaveStatus, default: LeaveStatus.Pending })
-  status!: LeaveStatus;
+  @Column({ type: 'varchar', default: 'pending' })
+  status!: 'approved' | 'pending' | 'rejected';
 
-  @Column({ type: 'boolean', default: false })
-  isFullDay!: boolean;
+  @Column({ type: 'text', nullable: true })
+  notes!: string | null;
 
   @CreateDateColumn()
   createdAt!: Date;

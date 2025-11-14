@@ -40,7 +40,7 @@ export class AuthMiddleware implements NestMiddleware {
         const rec = await this.refreshRepo.findOne({ where: { tokenHash: h } });
         if (!rec || rec.revokedAt) throw new UnauthorizedException('Refresh revoked');
         if (rec.expiresAt && new Date(rec.expiresAt) < new Date()) throw new UnauthorizedException('Refresh expired');
-        const user = { id: payload.sub, email: payload.email, role: payload.role };
+        const user = { id: payload.sub, email: payload.email, role: payload.role, userType: payload.userType || (payload.role === 'patient' ? 'patient' : 'staff') };
         // rotate tokens and set cookies
         const tokens = await this.authSvc.rotateTokens(user, res, rec);
         req.user = { ...payload, id: payload.sub };

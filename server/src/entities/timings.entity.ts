@@ -27,11 +27,11 @@ export class Timings {
   @Column({ type: 'time' })
   endTime!: string;
 
-  @Column({ type: 'int', default: 15 })
-  slotDurationMinutes!: number;
-
   @Column({ type: 'boolean', default: true })
   isAvailable!: boolean;
+
+  @Column({ type: 'text', nullable: true })
+  notes!: string | null;
 
   @CreateDateColumn()
   createdAt!: Date;

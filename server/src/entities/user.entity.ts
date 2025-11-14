@@ -14,6 +14,11 @@ export enum UserRole {
   Patient = 'patient',
 }
 
+export enum UserType {
+  Staff = 'staff',
+  Patient = 'patient',
+}
+
 @Entity({ name: 'user' })
 export class User {
   @PrimaryGeneratedColumn('uuid')
@@ -26,8 +31,27 @@ export class User {
   @Column({ type: 'varchar' })
   passwordHash!: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  firstName!: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  lastName!: string | null;
+
+  @Column({ type: 'date', nullable: true })
+  dateOfBirth!: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  gender!: string | null;
+
+  @Index('idx_user_phone', { unique: false })
+  @Column({ type: 'varchar', nullable: true })
+  phone!: string | null;
+
   @Column({ type: 'enum', enum: UserRole })
   role!: UserRole;
+
+  @Column({ type: 'enum', enum: UserType, default: UserType.Patient })
+  type!: UserType;
 
   @CreateDateColumn()
   createdAt!: Date;

@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { Staff } from '../../entities/staff.entity';
 import { Timings } from '../../entities/timings.entity';
 import { Leave } from '../../entities/leave.entity';
-import { User, UserRole } from '../../entities/user.entity';
+import { User, UserRole, UserType } from '../../entities/user.entity';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -17,24 +17,51 @@ export class StaffService {
   ) {}
 
   async create(data: any) {
-    const { email, password, role, ...rest } = data || {};
-    if (!role && !rest?.role) throw new Error('staff role is required');
-    const staffRole = (role || rest.role);
+    const { email, password, role, firstName, lastName, dateOfBirth, gender, phone, notes } = data || {};
+    if (!role) throw new Error('staff role is required');
     if (email && password) {
       const exists = await this.userRepo.findOne({ where: { email } });
       if (exists) throw new Error('Email already in use');
       const passwordHash = await bcrypt.hash(password, 10);
-      const user = await this.userRepo.save(this.userRepo.create({ email, passwordHash, role: staffRole }));
-      const staff = this.repo.create({ ...rest, role: staffRole, user: { id: user.id } as any });
+      const user = await this.userRepo.save(this.userRepo.create({
+        email,
+        passwordHash,
+        role,
+        type: UserType.Staff,
+        firstName: firstName ?? null,
+        lastName: lastName ?? null,
+        dateOfBirth: dateOfBirth ?? null,
+        gender: gender ?? null,
+        phone: phone ?? null,
+      } as Partial<User>));
+      const staff = this.repo.create({ notes: notes ?? null, user: { id: user.id } as any });
       return this.repo.save(staff);
     }
     // Create staff profile only; invite later to set password
-    const staff = this.repo.create({ ...rest, role: staffRole });
+    const staff = this.repo.create({ notes: notes ?? null });
     return this.repo.save(staff);
   }
-  findAll() { return this.repo.find(); }
-  findOne(id: string) { return this.repo.findOne({ where: { id } }); }
-  async update(id: string, data: Partial<Staff>) { await this.repo.update({ id }, data); return this.findOne(id); }
+  findAll() { return this.repo.find({ relations: ['user'] }); }
+  findOne(id: string) { return this.repo.findOne({ where: { id }, relations: ['user'] }); }
+  async update(id: string, data: any) {
+    // Split user vs staff fields
+    const staffUpdates: Partial<Staff> = {};
+    if (typeof data.notes !== 'undefined') staffUpdates.notes = data.notes;
+    if (Object.keys(staffUpdates).length) await this.repo.update({ id }, staffUpdates);
+    if (data.firstName || data.lastName || data.phone || data.gender || data.dateOfBirth) {
+      const staff = await this.repo.findOne({ where: { id }, relations: ['user'] });
+      if (staff?.user?.id) {
+        await this.userRepo.update({ id: staff.user.id }, {
+          firstName: data.firstName ?? staff.user.firstName ?? null,
+          lastName: data.lastName ?? staff.user.lastName ?? null,
+          phone: data.phone ?? staff.user.phone ?? null,
+          gender: data.gender ?? staff.user.gender ?? null,
+          dateOfBirth: data.dateOfBirth ?? staff.user.dateOfBirth ?? null,
+        } as Partial<User>);
+      }
+    }
+    return this.findOne(id);
+  }
 
   getTimings(staffId: string) { return this.timingsRepo.find({ where: { staff: { id: staffId } as any } }); }
 

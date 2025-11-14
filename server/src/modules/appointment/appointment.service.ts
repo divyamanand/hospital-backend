@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, In, Not, Repository } from 'typeorm';
-import { Appointment, AppointmentStatus } from '../../entities/appointment.entity';
+import { Repository } from 'typeorm';
+import { Appointment } from '../../entities/appointment.entity';
 import { Staff } from '../../entities/staff.entity';
 import { Timings } from '../../entities/timings.entity';
 import { Leave } from '../../entities/leave.entity';
@@ -16,21 +16,16 @@ export class AppointmentService {
   ) {}
   create(data: Partial<Appointment>) { return this.repo.save(this.repo.create(data)); }
   findAll(filter?: any) {
-    const where: any = {};
-    if (filter?.patient_id) where.patient = { id: filter.patient_id } as any;
-    if (filter?.doctor_id) where.doctor = { id: filter.doctor_id } as any;
-    if (filter?.status) where.status = filter.status;
-    // date filter basic: scheduledStart >= from and <= to
     const qb = this.repo.createQueryBuilder('a').leftJoinAndSelect('a.patient','patient').leftJoinAndSelect('a.doctor','doctor');
     qb.where('1=1');
     if (filter?.patient_id) qb.andWhere('a.patient_id = :pid', { pid: filter.patient_id });
     if (filter?.doctor_id) qb.andWhere('a.doctor_id = :did', { did: filter.doctor_id });
     if (filter?.status) qb.andWhere('a.status = :st', { st: filter.status });
-    if (filter?.from) qb.andWhere('a.scheduled_start >= :from', { from: filter.from });
-    if (filter?.to) qb.andWhere('a.scheduled_start <= :to', { to: filter.to });
+    if (filter?.from) qb.andWhere('a.start_at >= :from', { from: filter.from });
+    if (filter?.to) qb.andWhere('a.start_at <= :to', { to: filter.to });
     return qb.getMany();
   }
-  findOne(id: string) { return this.repo.findOne({ where: { id }, relations: ['patient','doctor','specialty','room','requestedIssue'] }); }
+  findOne(id: string) { return this.repo.findOne({ where: { id }, relations: ['patient','doctor'] }); }
 
   async findMatchingDoctorsForIssues(payload: { issues?: string[]; specialty_ids?: string[]; timeWindow?: any; appointment_type?: string }) {
     const issues = Array.isArray(payload?.issues) ? payload!.issues : [];
@@ -78,7 +73,7 @@ export class AppointmentService {
 
       const dayTimings = timings.filter((t) => t.weekday === weekday);
       for (const t of dayTimings) {
-        const slotDuration = t.slotDurationMinutes || 15;
+        const slotDuration = 15;
         const dayStart = this.combineDateTime(date, t.startTime);
         const dayEnd = this.combineDateTime(date, t.endTime);
         // If today, move start forward to now
@@ -122,46 +117,40 @@ export class AppointmentService {
     // Leaves overlap if start < leave.end AND end > leave.start
     const leaveOverlap = await this.leaveRepo.createQueryBuilder('l')
       .where('l.staff_id = :did', { did: doctorId })
-      .andWhere('l.start_datetime < :end', { end })
-      .andWhere('l.end_datetime > :start', { start })
+      .andWhere('l.start_date <= :endDate', { endDate: end.toISOString().slice(0,10) })
+      .andWhere('l.end_date >= :startDate', { startDate: start.toISOString().slice(0,10) })
       .getCount();
     if (leaveOverlap > 0) return false;
 
     // Appointments overlap if start < appt.end AND end > appt.start and status not cancelled/no_show
-    const busyStatuses: AppointmentStatus[] = [
-      AppointmentStatus.Pending,
-      AppointmentStatus.Confirmed,
-      AppointmentStatus.CheckedIn,
-      AppointmentStatus.InProgress,
-      AppointmentStatus.Completed,
-    ];
+    const busyStatuses: string[] = ['scheduled','confirmed','checkedIn','completed'];
     const apptOverlap = await this.repo.createQueryBuilder('a')
       .where('a.doctor_id = :did', { did: doctorId })
       .andWhere('a.status IN (:...st)', { st: busyStatuses })
-      .andWhere('a.scheduled_start < :end', { end })
-      .andWhere('a.scheduled_end > :start', { start })
+      .andWhere('a.start_at < :end', { end })
+      .andWhere('a.end_at > :start', { start })
       .getCount();
     return apptOverlap === 0;
   }
 
   async book(data: Partial<Appointment>) {
-    if (!data?.doctor || !data?.patient || !data?.scheduledStart || !data?.scheduledEnd) {
-      throw new Error('Missing required fields: doctor, patient, scheduledStart, scheduledEnd');
+    if (!data?.doctor || !data?.patient || !data?.startAt || !data?.endAt) {
+      throw new Error('Missing required fields: doctor, patient, startAt, endAt');
     }
     const doctorId = (data.doctor as any)?.id || (data as any)?.doctorId;
-    const start = new Date(data.scheduledStart as any);
-    const end = new Date(data.scheduledEnd as any);
+    const start = new Date(data.startAt as any);
+    const end = new Date(data.endAt as any);
     const available = await this.isSlotAvailable(doctorId, start, end);
     if (!available) {
       throw new Error('Selected slot is no longer available');
     }
-    return this.create({ ...data, status: AppointmentStatus.Confirmed });
+    return this.create({ ...data, status: 'confirmed' as any });
   }
 
   async update(id: string, data: Partial<Appointment>) { await this.repo.update({ id }, data); return this.findOne(id); }
   async cancel(id: string, reason?: string) {
-    await this.repo.update({ id }, { status: AppointmentStatus.Cancelled, isDeleted: true, cancelReason: reason ?? null });
-    return { id, status: AppointmentStatus.Cancelled, cancelReason: reason ?? null } as any;
+    await this.repo.update({ id }, { status: 'cancelled' as any, cancelReason: reason ?? null });
+    return { id, status: 'cancelled', cancelReason: reason ?? null } as any;
   }
 
   async remove(id: string) {
@@ -170,13 +159,13 @@ export class AppointmentService {
   }
 
   async transition(id: string, action: 'confirm'|'checkin'|'complete') {
-    const statusMap: Record<typeof action, AppointmentStatus> = {
-      confirm: AppointmentStatus.Confirmed,
-      checkin: AppointmentStatus.CheckedIn,
-      complete: AppointmentStatus.Completed,
+    const statusMap: Record<'confirm'|'checkin'|'complete', any> = {
+      confirm: 'confirmed',
+      checkin: 'checkedIn',
+      complete: 'completed',
     } as any;
     const next = statusMap[action];
-    await this.repo.update({ id }, { status: next });
+    await this.repo.update({ id }, { status: next as any });
     return this.findOne(id);
   }
 }

@@ -3,10 +3,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Requirement, RequirementStatus, RequirementType } from '../../entities/requirement.entity';
 import { RequirementFulfillment } from '../../entities/requirement-fulfillment.entity';
-import { Staff, StaffRole, StaffStatus } from '../../entities/staff.entity';
+import { Staff, StaffStatus } from '../../entities/staff.entity';
 import { Timings } from '../../entities/timings.entity';
 import { Leave } from '../../entities/leave.entity';
 import { Appointment, AppointmentStatus } from '../../entities/appointment.entity';
+import { ItemRequirement } from '../../entities/item-requirement.entity';
+import { StaffRequirement } from '../../entities/staff-requirement.entity';
+import { RoomRequirement } from '../../entities/room-requirement.entity';
+import { Patient } from '../../entities/patient.entity';
+import { User } from '../../entities/user.entity';
 
 @Injectable()
 export class RequirementService {
@@ -17,6 +22,11 @@ export class RequirementService {
     @InjectRepository(Timings) private timingsRepo: Repository<Timings>,
     @InjectRepository(Leave) private leaveRepo: Repository<Leave>,
     @InjectRepository(Appointment) private apptRepo: Repository<Appointment>,
+    @InjectRepository(ItemRequirement) private itemReqRepo: Repository<ItemRequirement>,
+    @InjectRepository(StaffRequirement) private staffReqRepo: Repository<StaffRequirement>,
+    @InjectRepository(RoomRequirement) private roomReqRepo: Repository<RoomRequirement>,
+    @InjectRepository(Patient) private patientRepo: Repository<Patient>,
+    @InjectRepository(User) private userRepo: Repository<User>,
   ) {}
 
   create(data: Partial<Requirement>) { return this.reqRepo.save(this.reqRepo.create(data)); }
@@ -155,4 +165,51 @@ export class RequirementService {
     d.setHours(h||0,m||0,s||0,0);
     return d;
   }
+
+  // New: helpers and CRUD for item/staff/room requirement using primaryUserId
+  async resolvePrimaryUserId(actor: { userType?: string; role?: string; id: string }): Promise<string | null> {
+    if (!actor?.id) return null;
+    if (actor.userType === 'staff') {
+      const s = await this.staffRepo.findOne({ where: { id: actor.id }, relations: ['user'] });
+      return s?.user?.id || null;
+    }
+    if (actor.userType === 'patient') {
+      const p = await this.patientRepo.findOne({ where: { id: actor.id }, relations: ['user'] });
+      return p?.user?.id || null;
+    }
+    return null;
+  }
+
+  // Item Requirement
+  createItemRequirement(data: Partial<ItemRequirement>) { return this.itemReqRepo.save(this.itemReqRepo.create(data)); }
+  listItemRequirements(filter?: { primaryUserId?: string }) {
+    const where: any = {};
+    if (filter?.primaryUserId) where.primaryUserId = filter.primaryUserId;
+    return this.itemReqRepo.find({ where });
+  }
+  getItemRequirement(id: string) { return this.itemReqRepo.findOne({ where: { id } }); }
+  async updateItemRequirement(id: string, data: Partial<ItemRequirement>) { await this.itemReqRepo.update({ id }, data); return this.getItemRequirement(id); }
+  async deleteItemRequirement(id: string) { await this.itemReqRepo.delete({ id }); return { id, deleted: true } as any; }
+
+  // Staff Requirement
+  createStaffRequirement(data: Partial<StaffRequirement>) { return this.staffReqRepo.save(this.staffReqRepo.create(data)); }
+  listStaffRequirements(filter?: { primaryUserId?: string }) {
+    const where: any = {};
+    if (filter?.primaryUserId) where.primaryUserId = filter.primaryUserId;
+    return this.staffReqRepo.find({ where });
+  }
+  getStaffRequirement(id: string) { return this.staffReqRepo.findOne({ where: { id } }); }
+  async updateStaffRequirement(id: string, data: Partial<StaffRequirement>) { await this.staffReqRepo.update({ id }, data); return this.getStaffRequirement(id); }
+  async deleteStaffRequirement(id: string) { await this.staffReqRepo.delete({ id }); return { id, deleted: true } as any; }
+
+  // Room Requirement
+  createRoomRequirement(data: Partial<RoomRequirement>) { return this.roomReqRepo.save(this.roomReqRepo.create(data)); }
+  listRoomRequirements(filter?: { primaryUserId?: string }) {
+    const where: any = {};
+    if (filter?.primaryUserId) where.primaryUserId = filter.primaryUserId;
+    return this.roomReqRepo.find({ where });
+  }
+  getRoomRequirement(id: string) { return this.roomReqRepo.findOne({ where: { id } }); }
+  async updateRoomRequirement(id: string, data: Partial<RoomRequirement>) { await this.roomReqRepo.update({ id }, data); return this.getRoomRequirement(id); }
+  async deleteRoomRequirement(id: string) { await this.roomReqRepo.delete({ id }); return { id, deleted: true } as any; }
 }

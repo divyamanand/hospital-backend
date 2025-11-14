@@ -1,14 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn } from 'typeorm';
 import { InventoryItem } from './inventory-item.entity';
 
-export enum InventoryChangeReason {
-  Purchase = 'purchase',
-  Use = 'use',
-  Adjustment = 'adjustment',
-  PrescriptionFulfill = 'prescription_fulfill',
-  Transfer = 'transfer',
-}
-
 @Entity({ name: 'inventory_transaction' })
 export class InventoryTransaction {
   @PrimaryGeneratedColumn('uuid')
@@ -18,18 +10,18 @@ export class InventoryTransaction {
   @JoinColumn({ name: 'inventory_item_id' })
   inventoryItem!: InventoryItem;
 
-  @Column({ type: 'int' })
-  change!: number; // +/-
+  @Column({ type: 'varchar' })
+  type!: 'in' | 'out' | 'adjust' | 'fulfill';
 
-  @Column({ type: 'enum', enum: InventoryChangeReason })
-  reason!: InventoryChangeReason;
+  @Column({ type: 'int' })
+  quantity!: number;
 
   @Column({ type: 'varchar', nullable: true })
-  referenceId!: string | null; // e.g., prescription_item_id
+  reason!: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  refPrescriptionItemId!: string | null;
 
   @CreateDateColumn()
   createdAt!: Date;
-
-  @Column({ type: 'varchar', nullable: true })
-  createdBy!: string | null;
 }

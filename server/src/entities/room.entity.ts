@@ -22,22 +22,16 @@ export class Room {
   id!: string;
 
   @Column()
-  roomNumber!: string;
+  name!: string;
 
-  @Column({ type: 'enum', enum: RoomType })
-  type!: RoomType;
+  @Column({ type: 'varchar' })
+  type!: string;
 
-  @Column({ type: 'enum', enum: RoomStatus, default: RoomStatus.Available })
-  status!: RoomStatus;
+  @Column({ type: 'varchar', default: 'available' })
+  status!: 'available' | 'occupied' | 'maintenance' | 'reserved';
 
   @Column({ type: 'int', nullable: true })
   capacity!: number | null;
-
-  @Column({ type: 'json', nullable: true })
-  features!: any | null;
-
-  @Column({ type: 'varchar', nullable: true })
-  currentPatientId!: string | null;
 
   @CreateDateColumn()
   createdAt!: Date;

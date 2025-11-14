@@ -14,7 +14,7 @@ export class StaffController {
   list(@Req() req: any) {
     const role = req.user?.role;
     return this.svc.findAll().then(rows => {
-      if (role === 'receptionist') return rows.filter(r => r.role !== 'admin');
+      if (role === 'receptionist') return rows.filter(r => r.user?.role !== 'admin');
       return rows;
     });
   }
@@ -23,7 +23,7 @@ export class StaffController {
     const role = req.user?.role; const userStaffId = req.user?.staffId; // assuming mapped
     if (role === 'admin') return this.svc.findOne(id);
     if (role === 'receptionist') {
-      return this.svc.findOne(id).then(s => { if (s.role === 'admin') throw new ForbiddenException('Not allowed'); return s; });
+      return this.svc.findOne(id).then(s => { if (s.user?.role === 'admin') throw new ForbiddenException('Not allowed'); return s; });
     }
     if (['doctor','inventory','pharmacist','room_manager'].includes(role) && userStaffId === id) return this.svc.findOne(id);
     throw new ForbiddenException('Not allowed');
