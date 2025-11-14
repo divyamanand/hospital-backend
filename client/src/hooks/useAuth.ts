@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { query, mutate } from '@/lib/api'
 
 export type AppRole = 'admin' | 'receptionist' | 'doctor' | 'inventory' | 'room_manager' | 'patient'
@@ -6,15 +6,12 @@ export type AppRole = 'admin' | 'receptionist' | 'doctor' | 'inventory' | 'room_
 type Me = { id: string; role: AppRole; email: string }
 
 export function useAuthBootstrap() {
-  const [user, setUser] = useState<Me | null>(null)
-  const [loading, setLoading] = useState(true)
-  useEffect(() => {
-    query<Me>('/auth/me')
-      .then(setUser)
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false))
-  }, [])
-  return { user, loading, setUser }
+  const { data, isLoading } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => query<Me>('/auth/me'),
+    retry: false,
+  })
+  return { user: data ?? null, loading: isLoading }
 }
 
 export function useAuthActions() {
