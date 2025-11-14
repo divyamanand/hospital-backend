@@ -5,6 +5,8 @@ import { Appointment } from '../../entities/appointment.entity';
 import { Staff } from '../../entities/staff.entity';
 import { Timings } from '../../entities/timings.entity';
 import { Leave } from '../../entities/leave.entity';
+import { Specialty } from '../../entities/specialty.entity';
+import { LlmService } from '../llm/llm.service';
 
 @Injectable()
 export class AppointmentService {
@@ -13,44 +15,66 @@ export class AppointmentService {
     @InjectRepository(Staff) private staffRepo: Repository<Staff>,
     @InjectRepository(Timings) private timingsRepo: Repository<Timings>,
     @InjectRepository(Leave) private leaveRepo: Repository<Leave>,
+    @InjectRepository(Specialty) private specialtyRepo: Repository<Specialty>,
+    private llmService: LlmService,
   ) {}
   create(data: Partial<Appointment>) { return this.repo.save(this.repo.create(data)); }
   findAll(filter?: any) {
     const qb = this.repo.createQueryBuilder('a').leftJoinAndSelect('a.patient','patient').leftJoinAndSelect('a.doctor','doctor');
     qb.where('1=1');
-    if (filter?.patient_id) qb.andWhere('a.patient_id = :pid', { pid: filter.patient_id });
-    if (filter?.doctor_id) qb.andWhere('a.doctor_id = :did', { did: filter.doctor_id });
+    if (filter?.patient_id) qb.andWhere('a.patientId = :pid', { pid: filter.patient_id });
+    if (filter?.doctor_id) qb.andWhere('a.doctorId = :did', { did: filter.doctor_id });
     if (filter?.status) qb.andWhere('a.status = :st', { st: filter.status });
-    if (filter?.from) qb.andWhere('a.start_at >= :from', { from: filter.from });
-    if (filter?.to) qb.andWhere('a.start_at <= :to', { to: filter.to });
+    if (filter?.from) qb.andWhere('a.startAt >= :from', { from: filter.from });
+    if (filter?.to) qb.andWhere('a.startAt <= :to', { to: filter.to });
     return qb.getMany();
   }
   findOne(id: string) { return this.repo.findOne({ where: { id }, relations: ['patient','doctor'] }); }
 
   async findMatchingDoctorsForIssues(payload: { issues?: string[]; specialty_ids?: string[]; timeWindow?: any; appointment_type?: string }) {
     const issues = Array.isArray(payload?.issues) ? payload!.issues : [];
-    const specs = Array.isArray(payload?.specialty_ids) ? payload!.specialty_ids : [];
-    if (!issues.length && !specs.length) return [];
+    const specIds = Array.isArray(payload?.specialty_ids) ? payload!.specialty_ids : [];
+    if (!issues.length && !specIds.length) return [];
 
-    // Query doctors linked to specialties derived from issues and/or provided specialties.
-    // Only active doctors; prefer primary mappings.
+    // Load specialties from DB (either provided ids or all)
+    let specialties = [] as { id: string; name: string }[];
+    if (specIds.length) {
+      specialties = await this.specialtyRepo
+        .createQueryBuilder('s')
+        .where('s.id IN (:...ids)', { ids: specIds })
+        .getMany();
+    } else {
+      specialties = await this.specialtyRepo.createQueryBuilder('s').select(['s.id', 's.name']).getMany();
+    }
+
+    // Ask the LLM to infer which specialties are required for the provided issues
+    const inferred = await this.llmService.inferSpecialties(issues, specialties as any);
+    if (!inferred || !inferred.length) return [];
+
+    // Fetch doctors and their specialties
     const rows = await this.repo.query(
-      `WITH spec_from_issues AS (
-         SELECT DISTINCT i.mapped_specialty_id AS sid FROM issue i WHERE i.id = ANY($1::uuid[])
-       ), spec_union AS (
-         SELECT sid FROM spec_from_issues WHERE sid IS NOT NULL
-         UNION
-         SELECT UNNEST($2::uuid[])
-       )
-       SELECT DISTINCT ss.staff_id as "doctorId"
-       FROM staff_specialty ss
-       JOIN staff s ON s.id = ss.staff_id
-       WHERE ss.specialty_id IN (SELECT sid FROM spec_union)
-         AND s.role = 'doctor' AND s.status = 'active'
-       ORDER BY MAX(CASE WHEN ss.primary THEN 1 ELSE 0 END) DESC`,
-      [issues, specs],
+      `SELECT s.id as "doctorId", json_agg(json_build_object('id', sp.id, 'name', sp.name) ORDER BY ss.primary DESC) as specialties
+       FROM staff s
+       JOIN staff_specialty ss ON ss.staffId = s.id
+       JOIN specialty sp ON sp.id = ss.specialtyId
+       WHERE s.role = 'doctor'
+       GROUP BY s.id`,
+      [],
     );
-    return rows.map((r: any) => r.doctorId);
+
+    // Score doctors by how many of the inferred specialties they cover
+    const lowerInferred = inferred.map((x) => x.toLowerCase());
+    const results: Array<{ doctorId: string; score: number; specialties: Array<{ id: string; name: string }> }> = [];
+    for (const r of rows) {
+      const specs: Array<{ id: string; name: string }> = r.specialties || [];
+      const names = specs.map((s) => (s.name || '').toLowerCase());
+      const matched = lowerInferred.filter((inf) => names.includes(inf));
+      const score = lowerInferred.length ? matched.length / lowerInferred.length : 0;
+      if (score > 0) results.push({ doctorId: r.doctorId, score, specialties: specs });
+    }
+
+    // Sort by score desc and return
+    return results.sort((a, b) => b.score - a.score).map((x) => ({ doctorId: x.doctorId, score: x.score, specialties: x.specialties }));
   }
 
   async getDoctorNext3Slots(doctorId: string) {
@@ -116,19 +140,19 @@ export class AppointmentService {
   private async isSlotAvailable(doctorId: string, start: Date, end: Date): Promise<boolean> {
     // Leaves overlap if start < leave.end AND end > leave.start
     const leaveOverlap = await this.leaveRepo.createQueryBuilder('l')
-      .where('l.staff_id = :did', { did: doctorId })
-      .andWhere('l.start_date <= :endDate', { endDate: end.toISOString().slice(0,10) })
-      .andWhere('l.end_date >= :startDate', { startDate: start.toISOString().slice(0,10) })
+      .where('l.staffId = :did', { did: doctorId })
+      .andWhere('l.startDate <= :endDate', { endDate: end.toISOString().slice(0,10) })
+      .andWhere('l.endDate >= :startDate', { startDate: start.toISOString().slice(0,10) })
       .getCount();
     if (leaveOverlap > 0) return false;
 
     // Appointments overlap if start < appt.end AND end > appt.start and status not cancelled/no_show
     const busyStatuses: string[] = ['scheduled','confirmed','checkedIn','completed'];
     const apptOverlap = await this.repo.createQueryBuilder('a')
-      .where('a.doctor_id = :did', { did: doctorId })
+      .where('a.doctorId = :did', { did: doctorId })
       .andWhere('a.status IN (:...st)', { st: busyStatuses })
-      .andWhere('a.start_at < :end', { end })
-      .andWhere('a.end_at > :start', { start })
+      .andWhere('a.startAt < :end', { end })
+      .andWhere('a.endAt > :start', { start })
       .getCount();
     return apptOverlap === 0;
   }

@@ -7,7 +7,7 @@ export class PrescriptionItem {
   id!: string;
 
   @ManyToOne(() => Prescription, (p) => p.items, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'prescription_id' })
+  @JoinColumn({ name: 'prescriptionId' })
   prescription!: Prescription;
 
   @Column()
@@ -27,4 +27,10 @@ export class PrescriptionItem {
 
   @Column({ type: 'varchar', nullable: true })
   method!: string | null; // before food | after food
+
+  @Column({ type: 'timestamp', nullable: true })
+  createdAt!: Date | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  updatedAt!: Date | null;
 }

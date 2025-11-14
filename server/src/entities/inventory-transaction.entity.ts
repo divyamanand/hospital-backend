@@ -7,7 +7,7 @@ export class InventoryTransaction {
   id!: string;
 
   @ManyToOne(() => InventoryItem, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'inventory_item_id' })
+  @JoinColumn({ name: 'inventoryItemId' })
   inventoryItem!: InventoryItem;
 
   @Column({ type: 'varchar' })

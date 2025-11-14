@@ -10,11 +10,11 @@ export class Appointment {
   id!: string;
 
   @ManyToOne(() => Patient, { nullable: false })
-  @JoinColumn({ name: 'patient_id' })
+  @JoinColumn({ name: 'patientId' })
   patient!: Patient;
 
   @ManyToOne(() => Staff, { nullable: false })
-  @JoinColumn({ name: 'doctor_id' })
+  @JoinColumn({ name: 'doctorId' })
   doctor!: Staff | null;
 
   @Column({ type: 'timestamp' })

@@ -1,5 +1,12 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
+export enum RequirementStatus {
+  Open = 'open',
+  InProgress = 'inProgress',
+  Fulfilled = 'fulfilled',
+  Cancelled = 'cancelled',
+}
+
 @Entity({ name: 'item_requirement' })
 export class ItemRequirement {
   @PrimaryGeneratedColumn('uuid')
@@ -14,8 +21,8 @@ export class ItemRequirement {
   @Column({ type: 'int' })
   quantity!: number;
 
-  @Column({ type: 'varchar', default: 'pending' })
-  status!: string;
+  @Column({ type: 'enum', enum: RequirementStatus, default: RequirementStatus.Open })
+  status!: RequirementStatus;
 
   @Column({ type: 'text', nullable: true })
   notes!: string | null;

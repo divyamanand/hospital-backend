@@ -30,6 +30,6 @@ export class Staff {
 
   // Link to base user for authentication/authorization
   @OneToOne(() => User, (u: User) => u.staff, { nullable: true })
-  @JoinColumn({ name: 'user_id' })
+  @JoinColumn({ name: 'userId' })
   user?: User | null;
 }

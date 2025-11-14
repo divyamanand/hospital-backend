@@ -8,7 +8,7 @@ export class Patient {
   id!: string;
 
   @ManyToOne(() => Staff, { nullable: true })
-  @JoinColumn({ name: 'primary_physician_id' })
+  @JoinColumn({ name: 'primaryPhysicianId' })
   primaryPhysician!: Staff | null;
 
   @CreateDateColumn()
@@ -19,6 +19,6 @@ export class Patient {
 
   // Link to base user for authentication/authorization
   @OneToOne(() => User, (u: User) => u.patient, { nullable: true })
-  @JoinColumn({ name: 'user_id' })
+  @JoinColumn({ name: 'userId' })
   user?: User | null;
 }

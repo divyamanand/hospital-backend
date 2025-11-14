@@ -9,11 +9,11 @@ export class StaffSpecialty {
   id!: string;
 
   @ManyToOne(() => Staff, (s) => s.staffSpecialties, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'staff_id' })
+  @JoinColumn({ name: 'staffId' })
   staff!: Staff;
 
   @ManyToOne(() => Specialty, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'specialty_id' })
+  @JoinColumn({ name: 'specialtyId' })
   specialty!: Specialty;
 
   @Column({ type: 'boolean', default: false })

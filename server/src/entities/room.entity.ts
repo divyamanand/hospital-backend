@@ -1,12 +1,12 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
 export enum RoomType {
-  OperationTheatre = 'operation_theatre',
   Consultation = 'consultation',
+  Surgery = 'surgery',
   ICU = 'icu',
   Ward = 'ward',
-  Recovery = 'recovery',
   Lab = 'lab',
+  Storage = 'storage',
 }
 
 export enum RoomStatus {
@@ -24,11 +24,11 @@ export class Room {
   @Column()
   name!: string;
 
-  @Column({ type: 'varchar' })
-  type!: string;
+  @Column({ type: 'enum', enum: RoomType })
+  type!: RoomType;
 
-  @Column({ type: 'varchar', default: 'available' })
-  status!: 'available' | 'occupied' | 'maintenance' | 'reserved';
+  @Column({ type: 'enum', enum: RoomStatus, default: RoomStatus.Available })
+  status!: RoomStatus;
 
   @Column({ type: 'int', nullable: true })
   capacity!: number | null;

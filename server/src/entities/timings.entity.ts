@@ -15,7 +15,7 @@ export class Timings {
   id!: string;
 
   @ManyToOne(() => Staff, (s) => s.timings, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'staff_id' })
+  @JoinColumn({ name: 'staffId' })
   staff!: Staff;
 
   @Column({ type: 'int' })

@@ -1,4 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
+import { UserRole } from './user.entity';
 
 @Entity({ name: 'refresh_token' })
 export class RefreshToken {
@@ -9,8 +10,8 @@ export class RefreshToken {
   @Column({ type: 'varchar' })
   userId!: string; // patient.id or staff.id
 
-  @Column({ type: 'varchar' })
-  userRole!: string; // 'patient' | 'doctor' | 'admin' | ...
+  @Column({ type: 'enum', enum: UserRole })
+  userRole!: UserRole; // constrained to UserRole values
 
   @Index('idx_refresh_hash', { unique: true })
   @Column({ type: 'varchar' })

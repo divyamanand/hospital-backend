@@ -9,11 +9,11 @@ export class Prescription {
   id!: string;
 
   @ManyToOne(() => Patient)
-  @JoinColumn({ name: 'patient_id' })
+  @JoinColumn({ name: 'patientId' })
   patient!: Patient;
 
   @ManyToOne(() => Staff)
-  @JoinColumn({ name: 'doctor_id' })
+  @JoinColumn({ name: 'doctorId' })
   doctor!: Staff;
 
   @Column({ type: 'date', nullable: true })
@@ -27,6 +27,9 @@ export class Prescription {
 
   @CreateDateColumn()
   createdAt!: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  updatedAt!: Date | null;
 
   @OneToMany(() => PrescriptionItem, (pi) => pi.prescription)
   items!: PrescriptionItem[];

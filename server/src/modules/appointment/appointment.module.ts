@@ -8,9 +8,11 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Staff } from '../../entities/staff.entity';
 import { Timings } from '../../entities/timings.entity';
 import { Leave } from '../../entities/leave.entity';
+import { Specialty } from '../../entities/specialty.entity';
+import { LlmModule } from '../llm/llm.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Appointment, Staff, Timings, Leave])],
+  imports: [TypeOrmModule.forFeature([Appointment, Staff, Timings, Leave, Specialty]), LlmModule],
   controllers: [AppointmentController],
   providers: [AppointmentService, RolesGuard, JwtAuthGuard],
   exports: [AppointmentService]

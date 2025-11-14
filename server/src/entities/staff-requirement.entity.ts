@@ -1,4 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { RequirementStatus } from './item-requirement.entity';
 
 @Entity({ name: 'staff_requirement' })
 export class StaffRequirement {
@@ -14,8 +15,8 @@ export class StaffRequirement {
   @Column({ type: 'int' })
   quantity!: number;
 
-  @Column({ type: 'varchar', default: 'pending' })
-  status!: string;
+  @Column({ type: 'enum', enum: RequirementStatus, default: RequirementStatus.Open })
+  status!: RequirementStatus;
 
   @Column({ type: 'text', nullable: true })
   notes!: string | null;
