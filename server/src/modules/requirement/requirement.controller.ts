@@ -19,12 +19,17 @@ export class RequirementController {
   }
   @Get('items')
   @Roles('admin','receptionist','pharmacist','inventory','doctor','nurse','lab_tech','room_manager')
-  async listItemReq(@Req() req: any, @Query('mine') mine?: string) {
+  async listItemReq(@Req() req: any, @Query() q: any) {
     const role = req.user?.role;
-    if (['pharmacist','inventory','admin','receptionist'].includes(role)) return this.svc.listItemRequirements();
+    const filter: any = {};
+    if (q.status) filter.status = q.status;
+    if (q.primaryUserId) filter.primaryUserId = q.primaryUserId;
+    if (q.createdFrom) filter.createdFrom = q.createdFrom;
+    if (q.createdTo) filter.createdTo = q.createdTo;
+    if (['pharmacist','inventory','admin','receptionist'].includes(role)) return this.svc.listItemRequirements(filter);
     const primaryUserId = await this.svc.resolvePrimaryUserId(req.user || {});
     if (!primaryUserId) return [];
-    return this.svc.listItemRequirements({ primaryUserId });
+    return this.svc.listItemRequirements({ ...filter, primaryUserId });
   }
   @Get('items/:id')
   @Roles('admin','receptionist','pharmacist','inventory','doctor','nurse','lab_tech','room_manager')
@@ -56,12 +61,17 @@ export class RequirementController {
   }
   @Get('staff')
   @Roles('admin','receptionist','doctor','nurse','lab_tech','inventory','room_manager')
-  async listStaffReq(@Req() req: any) {
+  async listStaffReq(@Req() req: any, @Query() q: any) {
     const role = req.user?.role;
-    if (['admin','receptionist'].includes(role)) return this.svc.listStaffRequirements();
+    const filter: any = {};
+    if (q.status) filter.status = q.status;
+    if (q.primaryUserId) filter.primaryUserId = q.primaryUserId;
+    if (q.createdFrom) filter.createdFrom = q.createdFrom;
+    if (q.createdTo) filter.createdTo = q.createdTo;
+    if (['admin','receptionist'].includes(role)) return this.svc.listStaffRequirements(filter);
     const primaryUserId = await this.svc.resolvePrimaryUserId(req.user || {});
     if (!primaryUserId) return [];
-    return this.svc.listStaffRequirements({ primaryUserId });
+    return this.svc.listStaffRequirements({ ...filter, primaryUserId });
   }
   @Get('staff/:id')
   @Roles('admin','receptionist','doctor','nurse','lab_tech','inventory','room_manager')
@@ -93,12 +103,17 @@ export class RequirementController {
   }
   @Get('rooms')
   @Roles('admin','receptionist','room_manager','doctor','nurse','lab_tech','inventory')
-  async listRoomReq(@Req() req: any) {
+  async listRoomReq(@Req() req: any, @Query() q: any) {
     const role = req.user?.role;
-    if (['admin','receptionist','room_manager'].includes(role)) return this.svc.listRoomRequirements();
+    const filter: any = {};
+    if (q.status) filter.status = q.status;
+    if (q.primaryUserId) filter.primaryUserId = q.primaryUserId;
+    if (q.createdFrom) filter.createdFrom = q.createdFrom;
+    if (q.createdTo) filter.createdTo = q.createdTo;
+    if (['admin','receptionist','room_manager'].includes(role)) return this.svc.listRoomRequirements(filter);
     const primaryUserId = await this.svc.resolvePrimaryUserId(req.user || {});
     if (!primaryUserId) return [];
-    return this.svc.listRoomRequirements({ primaryUserId });
+    return this.svc.listRoomRequirements({ ...filter, primaryUserId });
   }
   @Get('rooms/:id')
   @Roles('admin','receptionist','room_manager','doctor','nurse','lab_tech','inventory')

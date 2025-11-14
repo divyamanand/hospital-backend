@@ -18,12 +18,17 @@ export class PrescriptionController {
 
   @Get()
   @Roles('admin','doctor','inventory','pharmacist','patient')
-  list(@Query('patient_id') patientId?: string, @Req() req: any) {
+  list(@Query() q: any, @Req() req: any) {
     const role = req.user.role;
-    if (role === 'admin') return this.svc.findAll(patientId);
-    if (role === 'doctor') return this.svc.findAllForDoctor(req.user.staffId, patientId);
-    if (role === 'inventory' || role === 'pharmacist') return this.svc.findAllForDispense(patientId);
-    if (role === 'patient') return this.svc.findAllForPatient(req.user.patientId);
+    const filter: any = {};
+    if (q.patient_id || q.patientId) filter.patientId = q.patient_id || q.patientId;
+    if (q.doctor_id || q.doctorId) filter.doctorId = q.doctor_id || q.doctorId;
+    if (q.from) filter.from = q.from;
+    if (q.to) filter.to = q.to;
+    if (role === 'admin') return this.svc.findAll(filter);
+    if (role === 'doctor') return this.svc.findAllForDoctor(req.user.staffId, filter);
+    if (role === 'inventory' || role === 'pharmacist') return this.svc.findAllForDispense(filter);
+    if (role === 'patient') return this.svc.findAllForPatient(req.user.patientId, filter);
     throw new ForbiddenException();
   }
 

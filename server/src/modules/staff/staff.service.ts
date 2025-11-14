@@ -7,6 +7,15 @@ import { Leave } from '../../entities/leave.entity';
 import { User, UserRole, UserType } from '../../entities/user.entity';
 import * as bcrypt from 'bcryptjs';
 
+function withinNow(startTime: string, endTime: string, nowMinutes: number): boolean {
+  // time strings HH:MM[:SS]
+  const [sh, sm] = startTime.split(':').map(v => parseInt(v || '0',10));
+  const [eh, em] = endTime.split(':').map(v => parseInt(v || '0',10));
+  const startM = sh * 60 + sm;
+  const endM = eh * 60 + em;
+  return nowMinutes >= startM && nowMinutes < endM;
+}
+
 @Injectable()
 export class StaffService {
   constructor(
@@ -41,7 +50,49 @@ export class StaffService {
     const staff = this.repo.create({ notes: notes ?? null });
     return this.repo.save(staff);
   }
-  findAll() { return this.repo.find({ relations: ['user'] }); }
+  async findAll(filter?: any) {
+    // Basic load with user relation
+    let rows = await this.repo.find({ relations: ['user'] });
+    if (!filter) return rows;
+    // role filter (role stored on user)
+    if (filter.role) rows = rows.filter(r => r.user?.role === filter.role);
+    // specialty filter via raw query for efficiency
+    if (filter.specialtyId) {
+      const specStaffIds = await this.repo.query(
+        'SELECT staffId FROM staff_specialty WHERE specialtyId = $1',
+        [filter.specialtyId],
+      );
+      const allowedIds = new Set(specStaffIds.map((r: any) => r.staffid || r.staffId));
+      rows = rows.filter(r => allowedIds.has(r.id));
+    }
+    // onLeave / isAvailable determination (simplified)
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0,10);
+    if (filter.onLeave || filter.isAvailable) {
+      // Preload leave and timings maps
+      const staffIds = rows.map(r => r.id);
+      if (staffIds.length) {
+        const leaves = await this.leaveRepo.createQueryBuilder('l')
+          .where('l.staffId IN (:...ids)', { ids: staffIds })
+          .andWhere('l.status = :st', { st: 'approved' })
+          .andWhere(':today BETWEEN l.startDate AND l.endDate', { today: todayStr })
+          .getMany();
+        const leaveSet = new Set(leaves.map(l => l.staff.id));
+        const timings = await this.timingsRepo.createQueryBuilder('t')
+          .where('t.staffId IN (:...ids)', { ids: staffIds })
+          .andWhere('t.isAvailable = true')
+          .getMany();
+        const weekday = today.getDay();
+        const nowMinutes = today.getHours() * 60 + today.getMinutes();
+        const availSet = new Set(
+          timings.filter(t => t.weekday === weekday && withinNow(t.startTime, t.endTime, nowMinutes)).map(t => t.staff.id),
+        );
+        if (filter.onLeave) rows = rows.filter(r => leaveSet.has(r.id));
+        if (filter.isAvailable) rows = rows.filter(r => availSet.has(r.id) && !leaveSet.has(r.id));
+      }
+    }
+    return rows;
+  }
   findOne(id: string) { return this.repo.findOne({ where: { id }, relations: ['user'] }); }
   async update(id: string, data: any) {
     // Split user vs staff fields

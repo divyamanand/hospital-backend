@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Patient } from './patient.entity';
 
 export enum RoomType {
   Consultation = 'consultation',
@@ -32,6 +33,10 @@ export class Room {
 
   @Column({ type: 'int', nullable: true })
   capacity!: number | null;
+
+  @ManyToOne(() => Patient, { nullable: true })
+  @JoinColumn({ name: 'currentPatientId' })
+  currentPatient!: Patient | null;
 
   @CreateDateColumn()
   createdAt!: Date;

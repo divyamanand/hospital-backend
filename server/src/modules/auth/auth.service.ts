@@ -8,6 +8,7 @@ import { RefreshToken } from '../../entities/refresh-token.entity';
 import { hashRefresh } from './refresh.util';
 import { User, UserRole, UserType } from '../../entities/user.entity';
 import { Invitation } from '../../entities/invitation.entity';
+import { ActivityService } from '../activity/activity.service';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 
@@ -20,6 +21,7 @@ export class AuthService {
     @InjectRepository(RefreshToken) private refreshRepo: Repository<RefreshToken>,
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(Invitation) private inviteRepo: Repository<Invitation>,
+    private readonly activitySvc?: ActivityService,
   ) {}
 
   async validateUser(email: string, password: string) {
@@ -189,6 +191,56 @@ export class AuthService {
     if (inv.patientId) sessionUser.patientId = inv.patientId;
     await this.createSession(sessionUser, res);
     return { user: sessionUser, accessExpires: new Date(Date.now() + parseDurationMs(process.env.ACCESS_TTL || '30m')) };
+  }
+
+  async requestPasswordReset(body: any, ip?: string) {
+    const { email } = body || {};
+    if (!email) throw new BadRequestException('email required');
+    const user = await this.userRepo.findOne({ where: { email } });
+    // Always respond OK to prevent email enumeration
+    const token = crypto.randomBytes(32).toString('hex');
+    const ttl = parseDurationMs(process.env.PASSWORD_RESET_TTL || '1h');
+    const expiresAt = new Date(Date.now() + ttl);
+    const inv = this.inviteRepo.create({ email, role: user?.role || UserRole.Patient, staffId: null, patientId: null, token, expiresAt, claimedAt: null, claimedByUserId: null });
+    await this.inviteRepo.save(inv);
+    try { await this.activitySvc?.log(user ? user.id : null, 'request-password-reset', ip || null, { email }); } catch { }
+    return { ok: true, token };
+  }
+
+  async confirmPasswordReset(body: any, res: any) {
+    const { token, newPassword } = body || {};
+    if (!token || !newPassword) throw new BadRequestException('token and newPassword required');
+    const inv = await this.inviteRepo.findOne({ where: { token } });
+    if (!inv) throw new BadRequestException('Invalid token');
+    if (new Date(inv.expiresAt) < new Date()) throw new BadRequestException('Token expired');
+    if (inv.claimedAt) throw new BadRequestException('Token already used');
+    const user = await this.userRepo.findOne({ where: { email: inv.email } });
+    if (!user) throw new BadRequestException('User not found');
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.userRepo.update({ id: user.id }, { passwordHash });
+    await this.inviteRepo.update({ id: inv.id }, { claimedAt: new Date(), claimedByUserId: user.id });
+    let enriched: any = { id: user.id, email: user.email, role: user.role, userType: user.role === UserRole.Patient ? UserType.Patient : UserType.Staff };
+    if (enriched.userType === UserType.Patient) {
+      const patient = await this.patientRepo.findOne({ where: { user: { id: user.id } as any } });
+      if (patient) enriched.patientId = patient.id;
+    } else {
+      const staff = await this.staffRepo.findOne({ where: { user: { id: user.id } as any } });
+      if (staff) enriched.staffId = staff.id;
+    }
+    await this.activitySvc?.log(user.id, 'confirm-password-reset', null, {});
+    await this.createSession(enriched, res);
+    return { ok: true, user: enriched, accessExpires: new Date(Date.now() + parseDurationMs(process.env.ACCESS_TTL || '30m')) };
+  }
+
+  async resetPassword(body: any) {
+    const { userId, newPassword } = body || {};
+    if (!userId || !newPassword) throw new BadRequestException('userId and newPassword required');
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) throw new BadRequestException('user not found');
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.userRepo.update({ id: userId }, { passwordHash });
+    try { await this.activitySvc?.log(user.id, 'admin-reset-password', null, {}); } catch { }
+    return { ok: true };
   }
 
   async bootstrapAdmin(body: any, res: any) {

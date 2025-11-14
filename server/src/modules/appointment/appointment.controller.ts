@@ -20,6 +20,29 @@ export class AppointmentController {
     if (q?.patientId) filter.patientId = q.patientId;
     if (q?.from) filter.from = q.from;
     if (q?.to) filter.to = q.to;
+    if (q?.timeframe) {
+      const tf = q.timeframe;
+      const now = new Date();
+      let start: Date | null = null; let end: Date | null = null;
+      if (tf === 'day') {
+        start = new Date(now); start.setHours(0,0,0,0);
+        end = new Date(start); end.setDate(start.getDate()+1);
+      } else if (tf === 'month') {
+        start = new Date(now.getFullYear(), now.getMonth(), 1, 0,0,0,0);
+        end = new Date(now.getFullYear(), now.getMonth()+1, 1, 0,0,0,0);
+      } else if (tf === 'year') {
+        start = new Date(now.getFullYear(), 0, 1, 0,0,0,0);
+        end = new Date(now.getFullYear()+1, 0, 1, 0,0,0,0);
+      }
+      if (start && end) {
+        filter.from = start.toISOString();
+        filter.to = end.toISOString();
+      }
+    }
+    if (q?.rangeStart && q?.rangeEnd) {
+      filter.from = new Date(q.rangeStart).toISOString();
+      filter.to = new Date(q.rangeEnd).toISOString();
+    }
     if (role === 'patient') filter.patientId = sub;
     if (role === 'doctor') filter.doctorId = sub;
     return this.svc.findAll(filter);

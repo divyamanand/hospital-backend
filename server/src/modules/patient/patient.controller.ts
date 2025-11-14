@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Put, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Put, UseGuards, Req, ForbiddenException, Query } from '@nestjs/common';
 import { PatientService } from './patient.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -13,7 +13,13 @@ export class PatientController {
   @Get()
   @UseGuards(RolesGuard)
   @Roles('admin','receptionist')
-  list() { return this.svc.findAll(); }
+  list(@Query() q: any) {
+    const filter: any = {};
+    if (q?.gender) filter.gender = q.gender;
+    if (q?.minAge) filter.minAge = parseInt(q.minAge,10);
+    if (q?.maxAge) filter.maxAge = parseInt(q.maxAge,10);
+    return this.svc.findAll(filter);
+  }
 
   @Get(':id')
   @UseGuards(RolesGuard)

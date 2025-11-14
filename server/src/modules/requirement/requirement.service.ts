@@ -182,10 +182,15 @@ export class RequirementService {
 
   // Item Requirement
   createItemRequirement(data: Partial<ItemRequirement>) { return this.itemReqRepo.save(this.itemReqRepo.create(data)); }
-  listItemRequirements(filter?: { primaryUserId?: string }) {
-    const where: any = {};
-    if (filter?.primaryUserId) where.primaryUserId = filter.primaryUserId;
-    return this.itemReqRepo.find({ where });
+  listItemRequirements(filter?: { primaryUserId?: string; status?: string; createdFrom?: string; createdTo?: string }) {
+    const qb = this.itemReqRepo.createQueryBuilder('r');
+    qb.where('1=1');
+    if (filter?.primaryUserId) qb.andWhere('r.primaryUserId = :puid', { puid: filter.primaryUserId });
+    if (filter?.status) qb.andWhere('r.status = :st', { st: filter.status });
+    if (filter?.createdFrom) qb.andWhere('r.createdAt >= :cf', { cf: filter.createdFrom });
+    if (filter?.createdTo) qb.andWhere('r.createdAt <= :ct', { ct: filter.createdTo });
+    qb.orderBy('r.createdAt','DESC');
+    return qb.getMany();
   }
   getItemRequirement(id: string) { return this.itemReqRepo.findOne({ where: { id } }); }
   async updateItemRequirement(id: string, data: Partial<ItemRequirement>) { await this.itemReqRepo.update({ id }, data); return this.getItemRequirement(id); }
@@ -193,10 +198,15 @@ export class RequirementService {
 
   // Staff Requirement
   createStaffRequirement(data: Partial<StaffRequirement>) { return this.staffReqRepo.save(this.staffReqRepo.create(data)); }
-  listStaffRequirements(filter?: { primaryUserId?: string }) {
-    const where: any = {};
-    if (filter?.primaryUserId) where.primaryUserId = filter.primaryUserId;
-    return this.staffReqRepo.find({ where });
+  listStaffRequirements(filter?: { primaryUserId?: string; status?: string; createdFrom?: string; createdTo?: string }) {
+    const qb = this.staffReqRepo.createQueryBuilder('r');
+    qb.where('1=1');
+    if (filter?.primaryUserId) qb.andWhere('r.primaryUserId = :puid', { puid: filter.primaryUserId });
+    if (filter?.status) qb.andWhere('r.status = :st', { st: filter.status });
+    if (filter?.createdFrom) qb.andWhere('r.createdAt >= :cf', { cf: filter.createdFrom });
+    if (filter?.createdTo) qb.andWhere('r.createdAt <= :ct', { ct: filter.createdTo });
+    qb.orderBy('r.createdAt','DESC');
+    return qb.getMany();
   }
   getStaffRequirement(id: string) { return this.staffReqRepo.findOne({ where: { id } }); }
   async updateStaffRequirement(id: string, data: Partial<StaffRequirement>) { await this.staffReqRepo.update({ id }, data); return this.getStaffRequirement(id); }
@@ -204,10 +214,15 @@ export class RequirementService {
 
   // Room Requirement
   createRoomRequirement(data: Partial<RoomRequirement>) { return this.roomReqRepo.save(this.roomReqRepo.create(data)); }
-  listRoomRequirements(filter?: { primaryUserId?: string }) {
-    const where: any = {};
-    if (filter?.primaryUserId) where.primaryUserId = filter.primaryUserId;
-    return this.roomReqRepo.find({ where });
+  listRoomRequirements(filter?: { primaryUserId?: string; status?: string; createdFrom?: string; createdTo?: string }) {
+    const qb = this.roomReqRepo.createQueryBuilder('r');
+    qb.where('1=1');
+    if (filter?.primaryUserId) qb.andWhere('r.primaryUserId = :puid', { puid: filter.primaryUserId });
+    if (filter?.status) qb.andWhere('r.status = :st', { st: filter.status });
+    if (filter?.createdFrom) qb.andWhere('r.createdAt >= :cf', { cf: filter.createdFrom });
+    if (filter?.createdTo) qb.andWhere('r.createdAt <= :ct', { ct: filter.createdTo });
+    qb.orderBy('r.createdAt','DESC');
+    return qb.getMany();
   }
   getRoomRequirement(id: string) { return this.roomReqRepo.findOne({ where: { id } }); }
   async updateRoomRequirement(id: string, data: Partial<RoomRequirement>) { await this.roomReqRepo.update({ id }, data); return this.getRoomRequirement(id); }

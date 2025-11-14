@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Delete, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Delete, UseGuards, Query } from '@nestjs/common';
 import { InventoryService } from './inventory.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -11,7 +11,13 @@ export class InventoryController {
 
   @Get('inventory')
   @Roles('admin','pharmacist','inventory')
-  list() { return this.svc.listItems(); }
+  list(@Query() q: any) {
+    const filter: any = {};
+    if (q.type) filter.type = q.type;
+    if (q.lowStock) filter.lowStock = parseInt(q.lowStock,10);
+    if (q.expiryBefore) filter.expiryBefore = q.expiryBefore;
+    return this.svc.listItems(filter);
+  }
   @Get('inventory/type/:type')
   @Roles('admin','pharmacist','inventory')
   listByType(@Param('type') type: string) { return this.svc.listByType(type as any); }
@@ -50,4 +56,15 @@ export class InventoryController {
   @Post('prescription/:id/fulfill')
   @Roles('admin','pharmacist','inventory')
   fulfillPrescription(@Param('id') id: string) { return this.svc.fulfillPrescription(id); }
+
+  @Get('inventory/transactions')
+  @Roles('admin','pharmacist','inventory')
+  listTransactions(@Query() q: any) {
+    const filter: any = {};
+    if (q.itemId) filter.itemId = q.itemId;
+    if (q.type) filter.type = q.type;
+    if (q.from) filter.from = q.from;
+    if (q.to) filter.to = q.to;
+    return this.svc.listTransactions(filter);
+  }
 }

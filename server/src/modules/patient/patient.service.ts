@@ -5,6 +5,14 @@ import { Patient } from '../../entities/patient.entity';
 import { User, UserRole, UserType } from '../../entities/user.entity';
 import * as bcrypt from 'bcryptjs';
 
+function calcAgeYears(dob: Date): number {
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const mDiff = now.getMonth() - dob.getMonth();
+  if (mDiff < 0 || (mDiff === 0 && now.getDate() < dob.getDate())) age--;
+  return age;
+}
+
 @Injectable()
 export class PatientService {
   constructor(
@@ -36,7 +44,22 @@ export class PatientService {
     const patient = this.repo.create({ primaryPhysician: primaryPhysicianId ? ({ id: primaryPhysicianId } as any) : null });
     return this.repo.save(patient);
   }
-  findAll() { return this.repo.find({ relations: ['user','primaryPhysician'] }); }
+  async findAll(filter?: any) {
+    let rows = await this.repo.find({ relations: ['user','primaryPhysician'] });
+    if (!filter) return rows;
+    if (filter.gender) rows = rows.filter(r => r.user?.gender === filter.gender);
+    if (filter.minAge || filter.maxAge) {
+      rows = rows.filter(r => {
+        const dob = r.user?.dateOfBirth ? new Date(r.user.dateOfBirth) : null;
+        if (!dob) return false; // exclude if no DOB when filtering by age
+        const age = calcAgeYears(dob);
+        if (filter.minAge && age < filter.minAge) return false;
+        if (filter.maxAge && age > filter.maxAge) return false;
+        return true;
+      });
+    }
+    return rows;
+  }
   findOne(id: string) { return this.repo.findOne({ where: { id }, relations: ['user','primaryPhysician'] }); }
 
   async update(id: string, data: Partial<Patient>) {

@@ -12,10 +12,15 @@ import { RoomModule } from './modules/room/room.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { SpecialtyModule } from './modules/specialty/specialty.module';
 import { RequirementModule } from './modules/requirement/requirement.module';
+import { UserModule } from './modules/user/user.module';
+import { StatsModule } from './modules/stats/stats.module';
 import { AuthMiddleware } from './modules/auth/auth.middleware';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { ActivityModule } from './modules/activity/activity.module';
+import { ActivityInterceptor } from './modules/activity/activity.interceptor';
+import { LeaveModule } from './modules/leave/leave.module';
 
 @Module({
   imports: [
@@ -43,10 +48,15 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     AuthModule,
     SpecialtyModule,
     RequirementModule,
+    ActivityModule,
+    LeaveModule,
+    StatsModule,
+    UserModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: ActivityInterceptor },
   ],
 })
 export class AppModule implements NestModule {

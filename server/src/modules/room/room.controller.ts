@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Delete, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Patch, Delete, Query, UseGuards } from '@nestjs/common';
 import { RoomService } from './room.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -11,7 +11,16 @@ export class RoomController {
 
   @Get()
   @Roles('admin','room_manager')
-  list() { return this.svc.findAll(); }
+  list(@Query() q: any) {
+    const filter: any = {};
+    if (q.status) filter.status = q.status;
+    if (q.type) filter.type = q.type;
+    if (q.capacityMin) filter.capacityMin = parseInt(q.capacityMin,10);
+    if (q.capacityMax) filter.capacityMax = parseInt(q.capacityMax,10);
+    if (q.patientId) filter.patientId = q.patientId;
+    if (q.available === 'true') filter.available = true;
+    return this.svc.findAll(filter);
+  }
   @Get(':id')
   @Roles('admin','room_manager')
   get(@Param('id') id: string) { return this.svc.findOne(id); }
@@ -29,9 +38,13 @@ export class RoomController {
   @Roles('admin','room_manager')
   book(@Param('id') id: string, @Body() body: any) { return this.svc.book(id, body); }
 
-  @Post(':id/status')
+  @Patch(':id/status')
   @Roles('admin','room_manager')
   changeStatus(@Param('id') id: string, @Body() body: { status: string }) { return this.svc.changeStatus(id, body.status as any); }
+
+  @Post(':id/assign')
+  @Roles('admin','room_manager')
+  assign(@Param('id') id: string, @Body() body: { patientId: string }) { return this.svc.assign(id, body); }
 
   @Get('available/list')
   @Roles('admin','room_manager')

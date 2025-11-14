@@ -15,7 +15,14 @@ export class InventoryService {
     @InjectRepository(PrescriptionItem) private presItemRepo: Repository<PrescriptionItem>,
   ) {}
 
-  listItems() { return this.itemRepo.find(); }
+  async listItems(filter?: any) {
+    const qb = this.itemRepo.createQueryBuilder('i');
+    qb.where('1=1');
+    if (filter?.type) qb.andWhere('i.type = :type', { type: filter.type });
+    if (filter?.lowStock) qb.andWhere('(i.quantity IS NULL OR i.quantity < :ls)', { ls: filter.lowStock });
+    if (filter?.expiryBefore) qb.andWhere('i.expiry IS NOT NULL AND i.expiry < :exp', { exp: filter.expiryBefore });
+    return qb.getMany();
+  }
   listByType(type: InventoryItem['type']) { return this.itemRepo.find({ where: { type } as any }); }
   createItem(data: Partial<InventoryItem>) { return this.itemRepo.save(this.itemRepo.create(data)); }
   async updateItem(id: string, data: Partial<InventoryItem>) { await this.itemRepo.update({ id }, data); return this.itemRepo.findOne({ where: { id } }); }
@@ -68,6 +75,16 @@ export class InventoryService {
     }));
     await this.itemRepo.update({ id }, { quantity: (item.quantity || 0) + body.quantity });
     return this.itemRepo.findOne({ where: { id } });
+  }
+  async listTransactions(filter?: any) {
+    const qb = this.txnRepo.createQueryBuilder('t').leftJoinAndSelect('t.inventoryItem','item');
+    qb.where('1=1');
+    if (filter?.itemId) qb.andWhere('t.inventoryItemId = :iid', { iid: filter.itemId });
+    if (filter?.type) qb.andWhere('t.type = :tt', { tt: filter.type });
+    if (filter?.from) qb.andWhere('t.createdAt >= :from', { from: filter.from });
+    if (filter?.to) qb.andWhere('t.createdAt <= :to', { to: filter.to });
+    qb.orderBy('t.createdAt','DESC');
+    return qb.getMany();
   }
   // Prescription fulfillment moved to prescription flow with explicit mapping in new schema
 }

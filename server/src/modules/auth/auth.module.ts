@@ -9,10 +9,12 @@ import { Patient } from '../../entities/patient.entity';
 import { RefreshToken } from '../../entities/refresh-token.entity';
 import { User } from '../../entities/user.entity';
 import { Invitation } from '../../entities/invitation.entity';
+import { ActivityModule } from '../activity/activity.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Staff, Patient, RefreshToken, User, Invitation]),
+    ActivityModule,
     JwtModule.register({
       global: true,
       secret: process.env.JWT_SECRET || 'dev_secret_change_me',

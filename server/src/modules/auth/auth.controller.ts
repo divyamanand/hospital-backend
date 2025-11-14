@@ -37,6 +37,17 @@ export class AuthController {
     return this.svc.acceptInvite(body, res);
   }
 
+  @Post('request-password-reset')
+  requestPasswordReset(@Body() body: any, @Req() req: any) {
+    const ip = req?.ip || req?.headers?.['x-forwarded-for'] || null;
+    return this.svc.requestPasswordReset(body, ip);
+  }
+
+  @Post('confirm-password-reset')
+  confirmPasswordReset(@Body() body: any, @Res({ passthrough: true }) res: any) {
+    return this.svc.confirmPasswordReset(body, res);
+  }
+
   @Post('logout')
   logout(@Res({ passthrough: true }) res: any) { return this.svc.logout(res); }
 
@@ -48,5 +59,12 @@ export class AuthController {
   @Post('bootstrap-admin')
   bootstrapAdmin(@Body() body: any, @Res({ passthrough: true }) res: any) {
     return this.svc.bootstrapAdmin(body, res);
+  }
+
+  @Post('reset-password')
+  @Roles('admin')
+  @UseGuards(JwtAuthGuard)
+  resetPassword(@Body() body: any) {
+    return this.svc.resetPassword(body);
   }
 }

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Put, Delete, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Put, Delete, UseGuards, Req, ForbiddenException, Query } from '@nestjs/common';
 import { StaffService } from './staff.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -11,9 +11,14 @@ export class StaffController {
   constructor(private svc: StaffService) {}
   @Get()
   @Roles('admin','receptionist')
-  list(@Req() req: any) {
+  list(@Req() req: any, @Query() q: any) {
     const role = req.user?.role;
-    return this.svc.findAll().then(rows => {
+    const filter: any = {};
+    if (q?.role) filter.role = q.role;
+    if (q?.specialtyId) filter.specialtyId = q.specialtyId;
+    if (q?.isAvailable) filter.isAvailable = q.isAvailable === 'true';
+    if (q?.onLeave) filter.onLeave = q.onLeave === 'true';
+    return this.svc.findAll(filter).then(rows => {
       if (role === 'receptionist') return rows.filter(r => r.user?.role !== 'admin');
       return rows;
     });
@@ -23,7 +28,7 @@ export class StaffController {
     const role = req.user?.role; const userStaffId = req.user?.staffId; // assuming mapped
     if (role === 'admin') return this.svc.findOne(id);
     if (role === 'receptionist') {
-      return this.svc.findOne(id).then(s => { if (s.user?.role === 'admin') throw new ForbiddenException('Not allowed'); return s; });
+      return this.svc.findOne(id).then(s => { if (!s || s.user?.role === 'admin') throw new ForbiddenException('Not allowed'); return s; });
     }
     if (['doctor','inventory','pharmacist','room_manager'].includes(role) && userStaffId === id) return this.svc.findOne(id);
     throw new ForbiddenException('Not allowed');
