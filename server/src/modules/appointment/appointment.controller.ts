@@ -45,16 +45,54 @@ export class AppointmentController {
     }
     if (role === 'patient') filter.patientId = sub;
     if (role === 'doctor') filter.doctorId = sub;
-    return this.svc.findAll(filter);
+    return this.svc.findAll(filter).then(rows => rows.map(r => {
+      const patientId = (r.patient as any)?.id || null;
+      const doctorId = (r.doctor as any)?.id || null;
+      const pUser = (r.patient as any)?.user || null;
+      const dUser = (r.doctor as any)?.user || null;
+      const patientName = pUser ? [pUser.firstName||'', pUser.lastName||''].join(' ').trim() || null : null;
+      const doctorName = dUser ? [dUser.firstName||'', dUser.lastName||''].join(' ').trim() || null : null;
+      return {
+        id: r.id,
+        patientId,
+        doctorId,
+        patientName,
+        doctorName,
+        startAt: r.startAt,
+        endAt: r.endAt,
+        status: r.status,
+        issues: r.issues,
+        createdAt: (r as any).createdAt,
+        updatedAt: (r as any).updatedAt,
+      };
+    }));
   }
   @Get(':id')
   async get(@Param('id') id: string, @Req() req: any) {
-    const appt = await this.svc.findOne(id);
+    const r = await this.svc.findOne(id);
     const role = req.user?.role; const sub = req.user?.id;
-    if (!appt) return appt;
-    if (role === 'admin' || role === 'receptionist') return appt;
-    if (role === 'patient' && (appt.patient as any)?.id === sub) return appt;
-    if (role === 'doctor' && (appt.doctor as any)?.id === sub) return appt;
+    if (!r) return r;
+    if (role === 'admin' || role === 'receptionist' || (role === 'patient' && (r.patient as any)?.id === sub) || (role === 'doctor' && (r.doctor as any)?.id === sub)) {
+      const patientId = (r.patient as any)?.id || null;
+      const doctorId = (r.doctor as any)?.id || null;
+      const pUser = (r.patient as any)?.user || null;
+      const dUser = (r.doctor as any)?.user || null;
+      const patientName = pUser ? [pUser.firstName||'', pUser.lastName||''].join(' ').trim() || null : null;
+      const doctorName = dUser ? [dUser.firstName||'', dUser.lastName||''].join(' ').trim() || null : null;
+      return {
+        id: r.id,
+        patientId,
+        doctorId,
+        patientName,
+        doctorName,
+        startAt: r.startAt,
+        endAt: r.endAt,
+        status: r.status,
+        issues: r.issues,
+        createdAt: (r as any).createdAt,
+        updatedAt: (r as any).updatedAt,
+      };
+    }
     throw new ForbiddenException('Not allowed');
   }
   @Post()
@@ -66,6 +104,7 @@ export class AppointmentController {
     const doctorIdInput = body.doctorId || body.doctor_id || body.doctor?.id;
     const startAt = body.startAt;
     const endAt = body.endAt;
+    const issues = Array.isArray(body.issues) ? body.issues : undefined;
     if (role === 'patient' && patientIdInput && patientIdInput !== sub) throw new ForbiddenException('Patients can only book for self');
     if (role === 'doctor' && doctorIdInput && doctorIdInput !== sub) throw new ForbiddenException('Doctors can only book their own slots');
     const patientId = role === 'patient' ? sub : patientIdInput;
@@ -73,7 +112,7 @@ export class AppointmentController {
     if (!patientId) throw new ForbiddenException('patientId required');
     if (!doctorId) throw new ForbiddenException('doctorId required');
     if (!startAt || !endAt) throw new ForbiddenException('startAt and endAt required');
-    return this.svc.book({ patient: { id: patientId } as any, doctor: { id: doctorId } as any, startAt, endAt });
+    return this.svc.book({ patient: { id: patientId } as any, doctor: { id: doctorId } as any, startAt, endAt, issues } as any);
   }
 
   @Post('findMatchingDoctorsForIssues')

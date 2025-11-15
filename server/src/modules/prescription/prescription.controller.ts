@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Query, UseGuards, Req, ForbiddenException } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query, UseGuards, Req, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrescriptionService } from './prescription.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -29,6 +29,24 @@ export class PrescriptionController {
     if (role === 'doctor') return this.svc.findAllForDoctor(req.user.staffId, filter);
     if (role === 'inventory' || role === 'pharmacist') return this.svc.findAllForDispense(filter);
     if (role === 'patient') return this.svc.findAllForPatient(req.user.patientId, filter);
+    throw new ForbiddenException();
+  }
+
+  @Get(':id')
+  @Roles('admin','doctor','inventory','pharmacist','patient')
+  async getOne(@Param('id') id: string, @Req() req: any) {
+    const role = req.user.role;
+    const row = await this.svc.findOne(id);
+    if (!row) throw new NotFoundException();
+    if (role === 'admin' || role === 'inventory' || role === 'pharmacist') return row;
+    if (role === 'doctor') {
+      if ((row as any)?.doctor?.id === req.user.staffId) return row;
+      throw new ForbiddenException();
+    }
+    if (role === 'patient') {
+      if ((row as any)?.patient?.id === req.user.patientId) return row;
+      throw new ForbiddenException();
+    }
     throw new ForbiddenException();
   }
 

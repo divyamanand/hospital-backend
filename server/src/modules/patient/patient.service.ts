@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Patient } from '../../entities/patient.entity';
 import { User, UserRole, UserType } from '../../entities/user.entity';
+import { Appointment } from '../../entities/appointment.entity';
+import { Prescription } from '../../entities/prescription.entity';
 import * as bcrypt from 'bcryptjs';
 
 function calcAgeYears(dob: Date): number {
@@ -18,6 +20,8 @@ export class PatientService {
   constructor(
     @InjectRepository(Patient) private repo: Repository<Patient>,
     @InjectRepository(User) private userRepo: Repository<User>,
+    @InjectRepository(Appointment) private apptRepo: Repository<Appointment>,
+    @InjectRepository(Prescription) private presRepo: Repository<Prescription>,
   ) {}
 
   async create(data: any) {
@@ -60,6 +64,46 @@ export class PatientService {
     }
     return rows;
   }
+  
+  async findAllSummaries(filter?: any) {
+    const rows = await this.findAll(filter);
+    if (!rows.length) return [] as any[];
+    const ids = rows.map((r) => r.id);
+
+    const apptCountsRaw = await this.apptRepo.createQueryBuilder('a')
+      .select('a.patientId', 'patientId')
+      .addSelect('COUNT(*)', 'count')
+      .where('a.patientId IN (:...ids)', { ids })
+      .groupBy('a.patientId')
+      .getRawMany();
+    const presCountsRaw = await this.presRepo.createQueryBuilder('p')
+      .select('p.patientId', 'patientId')
+      .addSelect('COUNT(*)', 'count')
+      .where('p.patientId IN (:...ids)', { ids })
+      .groupBy('p.patientId')
+      .getRawMany();
+    const apptMap = new Map(apptCountsRaw.map((r: any) => [r.patientId, parseInt(r.count, 10)]));
+    const presMap = new Map(presCountsRaw.map((r: any) => [r.patientId, parseInt(r.count, 10)]));
+
+    return rows.map((r) => {
+      const firstName = r.user?.firstName || '';
+      const lastName = r.user?.lastName || '';
+      const name = [firstName, lastName].join(' ').trim() || null;
+      const dob = r.user?.dateOfBirth ? new Date(r.user.dateOfBirth) : null;
+      const age = dob ? calcAgeYears(dob) : null;
+      const gender = r.user?.gender || null;
+      return {
+        id: r.id,
+        name,
+        dateOfBirth: r.user?.dateOfBirth || null,
+        gender,
+        age,
+        createdAt: r.createdAt,
+        appointmentsCount: apptMap.get(r.id) || 0,
+        prescriptionsCount: presMap.get(r.id) || 0,
+      };
+    });
+  }
   findOne(id: string) { return this.repo.findOne({ where: { id }, relations: ['user','primaryPhysician'] }); }
 
   async update(id: string, data: Partial<Patient>) {
@@ -87,5 +131,26 @@ export class PatientService {
       [patientId, doctorId],
     );
     return rx.length > 0;
+  }
+
+  async getAppointmentsForPatient(patientId: string) {
+    const qb = this.apptRepo
+      .createQueryBuilder('a')
+      .leftJoinAndSelect('a.patient', 'patient')
+      .leftJoinAndSelect('a.doctor', 'doctor')
+      .where('a.patientId = :pid', { pid: patientId })
+      .orderBy('a.startAt', 'DESC');
+    return qb.getMany();
+  }
+
+  async getPrescriptionsForPatient(patientId: string) {
+    const qb = this.presRepo
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.patient', 'patient')
+      .leftJoinAndSelect('p.doctor', 'doctor')
+      .leftJoinAndSelect('p.items', 'items')
+      .where('p.patientId = :pid', { pid: patientId })
+      .orderBy('p.createdAt', 'DESC');
+    return qb.getMany();
   }
 }

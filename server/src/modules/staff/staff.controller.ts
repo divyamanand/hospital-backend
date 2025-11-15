@@ -9,6 +9,7 @@ import { Roles } from '../auth/roles.decorator';
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class StaffController {
   constructor(private svc: StaffService) {}
+  
   @Get()
   @Roles('admin','receptionist')
   list(@Req() req: any, @Query() q: any) {
@@ -18,19 +19,19 @@ export class StaffController {
     if (q?.specialtyId) filter.specialtyId = q.specialtyId;
     if (q?.isAvailable) filter.isAvailable = q.isAvailable === 'true';
     if (q?.onLeave) filter.onLeave = q.onLeave === 'true';
-    return this.svc.findAll(filter).then(rows => {
-      if (role === 'receptionist') return rows.filter(r => r.user?.role !== 'admin');
+    return this.svc.findAllDetailed(filter).then(rows => {
+      if (role === 'receptionist') return rows.filter(r => r.role !== 'admin');
       return rows;
     });
   }
   @Get(':id')
   get(@Param('id') id: string, @Req() req: any) {
     const role = req.user?.role; const userStaffId = req.user?.staffId; // assuming mapped
-    if (role === 'admin') return this.svc.findOne(id);
+    if (role === 'admin') return this.svc.findOneDetailed(id);
     if (role === 'receptionist') {
-      return this.svc.findOne(id).then(s => { if (!s || s.user?.role === 'admin') throw new ForbiddenException('Not allowed'); return s; });
+      return this.svc.findOneDetailed(id).then(s => { if (!s || s.role === 'admin') throw new ForbiddenException('Not allowed'); return s; });
     }
-    if (['doctor','inventory','pharmacist','room_manager'].includes(role) && userStaffId === id) return this.svc.findOne(id);
+    if (['doctor','inventory','pharmacist','room_manager'].includes(role) && userStaffId === id) return this.svc.findOneDetailed(id);
     throw new ForbiddenException('Not allowed');
   }
   @Post()

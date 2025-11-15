@@ -16,6 +16,15 @@ export class PrescriptionService {
   ) {}
 
   create(data: Partial<Prescription>) { return this.presRepo.save(this.presRepo.create(data)); }
+  findOne(id: string) {
+    return this.presRepo.findOne({ where: { id }, relations: ['items','patient','doctor'] });
+  }
+  async createForDoctor(data: any, doctorStaffId: string) {
+    const payload: Partial<Prescription> = { ...data };
+    if (doctorStaffId) (payload as any).doctor = { id: doctorStaffId } as any;
+    if ((data as any)?.patientId) (payload as any).patient = { id: (data as any).patientId } as any;
+    return this.create(payload);
+  }
   findAll(filter?: any) {
     const qb = this.presRepo.createQueryBuilder('p').leftJoinAndSelect('p.patient','patient').leftJoinAndSelect('p.doctor','doctor').leftJoinAndSelect('p.items','items');
     qb.where('1=1');

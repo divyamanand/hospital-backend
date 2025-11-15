@@ -18,7 +18,7 @@ export class PatientController {
     if (q?.gender) filter.gender = q.gender;
     if (q?.minAge) filter.minAge = parseInt(q.minAge,10);
     if (q?.maxAge) filter.maxAge = parseInt(q.maxAge,10);
-    return this.svc.findAll(filter);
+    return this.svc.findAllSummaries(filter);
   }
 
   @Get(':id')
@@ -60,6 +60,28 @@ export class PatientController {
     if (role === 'admin' || role === 'receptionist') return this.svc.getDoctorsFromPrescriptions(id);
     if (role === 'patient' && req.user?.patientId === id) return this.svc.getDoctorsFromPrescriptions(id);
     if (role === 'doctor' && await this.svc.isDoctorLinkedToPatient(req.user?.staffId, id)) return this.svc.getDoctorsFromPrescriptions(id);
+    throw new ForbiddenException('Not allowed');
+  }
+
+  @Get(':id/appointments')
+  @UseGuards(RolesGuard)
+  @Roles('admin','receptionist','doctor','patient')
+  async appointments(@Param('id') id: string, @Req() req: any) {
+    const role = req.user?.role;
+    if (role === 'admin' || role === 'receptionist') return this.svc.getAppointmentsForPatient(id);
+    if (role === 'patient' && req.user?.patientId === id) return this.svc.getAppointmentsForPatient(id);
+    if (role === 'doctor' && await this.svc.isDoctorLinkedToPatient(req.user?.staffId, id)) return this.svc.getAppointmentsForPatient(id);
+    throw new ForbiddenException('Not allowed');
+  }
+
+  @Get(':id/prescriptions')
+  @UseGuards(RolesGuard)
+  @Roles('admin','receptionist','doctor','patient')
+  async prescriptions(@Param('id') id: string, @Req() req: any) {
+    const role = req.user?.role;
+    if (role === 'admin' || role === 'receptionist') return this.svc.getPrescriptionsForPatient(id);
+    if (role === 'patient' && req.user?.patientId === id) return this.svc.getPrescriptionsForPatient(id);
+    if (role === 'doctor' && await this.svc.isDoctorLinkedToPatient(req.user?.staffId, id)) return this.svc.getPrescriptionsForPatient(id);
     throw new ForbiddenException('Not allowed');
   }
 }

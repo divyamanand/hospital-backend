@@ -20,7 +20,12 @@ export class AppointmentService {
   ) {}
   create(data: Partial<Appointment>) { return this.repo.save(this.repo.create(data)); }
   findAll(filter?: any) {
-    const qb = this.repo.createQueryBuilder('a').leftJoinAndSelect('a.patient','patient').leftJoinAndSelect('a.doctor','doctor');
+    const qb = this.repo
+      .createQueryBuilder('a')
+      .leftJoinAndSelect('a.patient','patient')
+      .leftJoinAndSelect('patient.user','puser')
+      .leftJoinAndSelect('a.doctor','doctor')
+      .leftJoinAndSelect('doctor.user','duser');
     qb.where('1=1');
     if (filter?.patientId) qb.andWhere('a.patientId = :pid', { pid: filter.patientId });
     if (filter?.doctorId) qb.andWhere('a.doctorId = :did', { did: filter.doctorId });
@@ -29,7 +34,7 @@ export class AppointmentService {
     if (filter?.to) qb.andWhere('a.startAt <= :to', { to: filter.to });
     return qb.getMany();
   }
-  findOne(id: string) { return this.repo.findOne({ where: { id }, relations: ['patient','doctor'] }); }
+  findOne(id: string) { return this.repo.findOne({ where: { id }, relations: ['patient','patient.user','doctor','doctor.user'] }); }
 
   async findMatchingDoctorsForIssues(payload: { issues?: string[]; specialty_ids?: string[]; timeWindow?: any; appointment_type?: string }) {
     const issues = Array.isArray(payload?.issues) ? payload!.issues : [];
@@ -168,10 +173,24 @@ export class AppointmentService {
     if (!available) {
       throw new Error('Selected slot is no longer available');
     }
-    return this.create({ ...data, status: 'confirmed' as any });
+    let issuesText: string | null = null;
+    const rawIssues = (data as any).issues;
+    if (Array.isArray(rawIssues)) issuesText = rawIssues.map((v) => (v || '').trim()).filter(v => v.length).join(', ');
+    else if (typeof rawIssues === 'string') issuesText = rawIssues.trim().length ? rawIssues.trim() : null;
+    return this.create({ ...data, issues: issuesText, status: 'confirmed' as any });
   }
 
-  async update(id: string, data: Partial<Appointment>) { await this.repo.update({ id }, data); return this.findOne(id); }
+  async update(id: string, data: Partial<Appointment>) {
+    const patch: any = { ...data };
+    if (typeof (data as any).issues !== 'undefined') {
+      const raw = (data as any).issues;
+      if (Array.isArray(raw)) patch.issues = raw.map((v) => (v || '').trim()).filter(v => v.length).join(', ');
+      else if (typeof raw === 'string') patch.issues = raw.trim().length ? raw.trim() : null;
+      else patch.issues = null;
+    }
+    await this.repo.update({ id }, patch);
+    return this.findOne(id);
+  }
   async cancel(id: string, reason?: string) {
     await this.repo.update({ id }, { status: 'cancelled' as any, cancelReason: reason ?? null });
     return { id, status: 'cancelled', cancelReason: reason ?? null } as any;

@@ -29,6 +29,9 @@ export class Appointment {
   @Column({ type: 'text', nullable: true })
   cancelReason!: string | null;
 
+  @Column({ type: 'text', nullable: true })
+  issues!: string | null; // comma separated issues
+
   @CreateDateColumn()
   createdAt!: Date;
 
