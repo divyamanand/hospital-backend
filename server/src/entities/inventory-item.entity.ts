@@ -17,12 +17,6 @@ export class InventoryItem {
   @Column({ type: 'varchar', nullable: true })
   unit!: string | null;
 
-  @Column({ type: 'date', nullable: true })
-  expiry!: string | null;
-
-  @Column({ type: 'varchar', nullable: true })
-  lotNumber!: string | null;
-
   @CreateDateColumn()
   createdAt!: Date;
 

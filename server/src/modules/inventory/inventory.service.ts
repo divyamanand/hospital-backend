@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InventoryItem } from '../../entities/inventory-item.entity';
 import { InventoryTransaction } from '../../entities/inventory-transaction.entity';
+import { InventoryStock } from '../../entities/inventory-stock.entity';
 import { Prescription } from '../../entities/prescription.entity';
 import { PrescriptionItem } from '../../entities/prescription-item.entity';
 
@@ -11,17 +12,35 @@ export class InventoryService {
   constructor(
     @InjectRepository(InventoryItem) private itemRepo: Repository<InventoryItem>,
     @InjectRepository(InventoryTransaction) private txnRepo: Repository<InventoryTransaction>,
+    @InjectRepository(InventoryStock) private stockRepo: Repository<InventoryStock>,
     @InjectRepository(Prescription) private presRepo: Repository<Prescription>,
     @InjectRepository(PrescriptionItem) private presItemRepo: Repository<PrescriptionItem>,
   ) {}
 
   async listItems(filter?: any) {
-    const qb = this.itemRepo.createQueryBuilder('i');
-    qb.where('1=1');
+    // Aggregate total quantity and nearest expiry from stocks
+    const qb = this.itemRepo.createQueryBuilder('i')
+      .leftJoin(InventoryStock, 's', 's."inventoryItemId" = i.id')
+      .select('i.id', 'id')
+      .addSelect('i.name', 'name')
+      .addSelect('i.type', 'type')
+      .addSelect('i.unit', 'unit')
+      .addSelect('COALESCE(SUM(s.quantity), 0)', 'quantity')
+      .addSelect('MIN(s.expiry)', 'expiry')
+      .groupBy('i.id');
     if (filter?.type) qb.andWhere('i.type = :type', { type: filter.type });
-    if (filter?.lowStock) qb.andWhere('(i.quantity IS NULL OR i.quantity < :ls)', { ls: filter.lowStock });
-    if (filter?.expiryBefore) qb.andWhere('i.expiry IS NOT NULL AND i.expiry < :exp', { exp: filter.expiryBefore });
-    return qb.getMany();
+    if (filter?.lowStock) qb.having('COALESCE(SUM(s.quantity),0) < :ls', { ls: filter.lowStock });
+    if (filter?.expiryBefore) qb.having('MIN(s.expiry) IS NOT NULL AND MIN(s.expiry) < :exp', { exp: filter.expiryBefore });
+    const rows = await qb.getRawMany();
+    // Map to InventoryItem-like objects for controller mapper
+    return rows.map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      type: r.type,
+      unit: r.unit,
+      quantity: parseInt(r.quantity, 10) || 0,
+      expiry: r.expiry || null,
+    }));
   }
   listByType(type: InventoryItem['type']) { return this.itemRepo.find({ where: { type } as any }); }
   createItem(data: Partial<InventoryItem>) { return this.itemRepo.save(this.itemRepo.create(data)); }
@@ -34,12 +53,14 @@ export class InventoryService {
       .getOne();
   }
 
-  async addStock(id: string, quantity: number, referenceId?: string) {
+  async addStock(id: string, quantity: number, referenceId?: string, unit?: string | null, expiry?: string | null) {
     const item = await this.itemRepo.findOne({ where: { id } });
     if (!item || quantity <= 0) return null;
+    const stock = await this.stockRepo.save(this.stockRepo.create({ inventoryItem: item, quantity, unit: unit ?? item.unit ?? null, expiry: expiry ?? null }));
     await this.txnRepo.save(this.txnRepo.create({ inventoryItem: item, type: 'in', quantity, reason: referenceId || null, refPrescriptionItemId: null }));
+    // maintain cached total quantity on item for compatibility
     await this.itemRepo.update({ id }, { quantity: (item.quantity || 0) + quantity });
-    return this.itemRepo.findOne({ where: { id } });
+    return stock;
   }
 
   async dispenseItem(id: string, quantity: number, referenceId?: string) {
@@ -86,5 +107,8 @@ export class InventoryService {
     qb.orderBy('t.createdAt','DESC');
     return qb.getMany();
   }
-  // Prescription fulfillment moved to prescription flow with explicit mapping in new schema
+  // Basic placeholder; prescription fulfillment handled in prescription module
+  async fulfillPrescription(prescriptionId: string) {
+    return { id: prescriptionId, status: 'not_implemented' } as any;
+  }
 }

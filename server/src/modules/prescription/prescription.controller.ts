@@ -25,10 +25,23 @@ export class PrescriptionController {
     if (q.doctor_id || q.doctorId) filter.doctorId = q.doctor_id || q.doctorId;
     if (q.from) filter.from = q.from;
     if (q.to) filter.to = q.to;
-    if (role === 'admin') return this.svc.findAll(filter);
-    if (role === 'doctor') return this.svc.findAllForDoctor(req.user.staffId, filter);
-    if (role === 'inventory' || role === 'pharmacist') return this.svc.findAllForDispense(filter);
-    if (role === 'patient') return this.svc.findAllForPatient(req.user.patientId, filter);
+    const mapBasic = (rows: any[]) => rows.map(r => {
+      const pUser = (r.patient as any)?.user || null;
+      const dUser = (r.doctor as any)?.user || null;
+      const patientName = pUser ? [pUser.firstName||'', pUser.lastName||''].join(' ').trim() || null : null;
+      const doctorName = dUser ? [dUser.firstName||'', dUser.lastName||''].join(' ').trim() || null : null;
+      return {
+        id: r.id,
+        patientName,
+        doctorName,
+        date: r.createdAt,
+        diagnosis: r.diagnosis || null,
+      };
+    });
+    if (role === 'admin') return this.svc.findAll(filter).then(mapBasic);
+    if (role === 'doctor') return this.svc.findAllForDoctor(req.user.staffId, filter).then(mapBasic);
+    if (role === 'inventory' || role === 'pharmacist') return this.svc.findAllForDispense(filter).then(mapBasic);
+    if (role === 'patient') return this.svc.findAllForPatient(req.user.patientId, filter).then(mapBasic);
     throw new ForbiddenException();
   }
 
@@ -38,16 +51,36 @@ export class PrescriptionController {
     const role = req.user.role;
     const row = await this.svc.findOne(id);
     if (!row) throw new NotFoundException();
-    if (role === 'admin' || role === 'inventory' || role === 'pharmacist') return row;
-    if (role === 'doctor') {
-      if ((row as any)?.doctor?.id === req.user.staffId) return row;
-      throw new ForbiddenException();
-    }
-    if (role === 'patient') {
-      if ((row as any)?.patient?.id === req.user.patientId) return row;
-      throw new ForbiddenException();
-    }
-    throw new ForbiddenException();
+    const allow = (
+      role === 'admin' || role === 'inventory' || role === 'pharmacist' ||
+      (role === 'doctor' && (row as any)?.doctor?.id === req.user.staffId) ||
+      (role === 'patient' && (row as any)?.patient?.id === req.user.patientId)
+    );
+    if (!allow) throw new ForbiddenException();
+    const pUser = (row.patient as any)?.user || null;
+    const dUser = (row.doctor as any)?.user || null;
+    const patientName = pUser ? [pUser.firstName||'', pUser.lastName||''].join(' ').trim() || null : null;
+    const doctorName = dUser ? [dUser.firstName||'', dUser.lastName||''].join(' ').trim() || null : null;
+    return {
+      id: row.id,
+      patientId: (row.patient as any)?.id || null,
+      doctorId: (row.doctor as any)?.id || null,
+      patientName,
+      doctorName,
+      diagnosis: row.diagnosis || null,
+      notes: row.notes || null,
+      items: Array.isArray(row.items) ? row.items.map((it: any) => ({
+        id: it.id,
+        name: it.name,
+        dosage: it.dosage,
+        duration: it.duration,
+        quantity: it.quantity,
+        dayDivide: it.dayDivide,
+        method: it.method,
+      })) : [],
+      date: row.createdAt,
+      nextReview: row.nextReview || null,
+    };
   }
 
   @Put(':id')

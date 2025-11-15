@@ -15,9 +15,32 @@ export class PrescriptionService {
     @InjectRepository(InventoryTransaction) private txnRepo: Repository<InventoryTransaction>,
   ) {}
 
-  create(data: Partial<Prescription>) { return this.presRepo.save(this.presRepo.create(data)); }
+  async create(data: any) {
+    const items = Array.isArray(data?.items) ? data.items : null;
+    const payload: any = { ...data };
+    delete payload.items;
+    if (payload.patientId && !payload.patient) payload.patient = { id: payload.patientId } as any;
+    if (payload.doctorId && !payload.doctor) payload.doctor = { id: payload.doctorId } as any;
+    const pres = await this.presRepo.save(this.presRepo.create(payload));
+    if (items && items.length) {
+      const now = new Date();
+      const toSave = items.map((it: any) => this.itemRepo.create({
+        prescription: { id: pres.id } as any,
+        name: it.name,
+        dosage: it.dosage,
+        duration: it.duration,
+        quantity: it.quantity,
+        dayDivide: it.dayDivide ?? null,
+        method: it.method ?? null,
+        createdAt: now,
+        updatedAt: now,
+      }));
+      await this.itemRepo.save(toSave);
+    }
+    return this.findOne(pres.id);
+  }
   findOne(id: string) {
-    return this.presRepo.findOne({ where: { id }, relations: ['items','patient','doctor'] });
+    return this.presRepo.findOne({ where: { id }, relations: ['items','patient','patient.user','doctor','doctor.user'] });
   }
   async createForDoctor(data: any, doctorStaffId: string) {
     const payload: Partial<Prescription> = { ...data };
@@ -26,7 +49,13 @@ export class PrescriptionService {
     return this.create(payload);
   }
   findAll(filter?: any) {
-    const qb = this.presRepo.createQueryBuilder('p').leftJoinAndSelect('p.patient','patient').leftJoinAndSelect('p.doctor','doctor').leftJoinAndSelect('p.items','items');
+    const qb = this.presRepo
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.patient','patient')
+      .leftJoinAndSelect('patient.user','puser')
+      .leftJoinAndSelect('p.doctor','doctor')
+      .leftJoinAndSelect('doctor.user','duser')
+      .leftJoinAndSelect('p.items','items');
     qb.where('1=1');
     if (filter?.patientId) qb.andWhere('p.patientId = :pid', { pid: filter.patientId });
     if (filter?.doctorId) qb.andWhere('p.doctorId = :did', { did: filter.doctorId });
@@ -34,11 +63,35 @@ export class PrescriptionService {
     if (filter?.to) qb.andWhere('p.createdAt <= :to', { to: filter.to });
     return qb.getMany();
   }
-  async update(id: string, data: Partial<Prescription>) { await this.presRepo.update({ id }, data); return this.presRepo.findOne({ where: { id }, relations: ['items','patient','doctor'] }); }
+  async update(id: string, data: any) {
+    const items = Array.isArray(data?.items) ? data.items : null;
+    const payload: any = { ...data };
+    delete payload.items;
+    await this.presRepo.update({ id }, payload);
+    if (items) {
+      // replace items set
+      await this.itemRepo.createQueryBuilder().delete().where('"prescriptionId" = :pid', { pid: id }).execute();
+      if (items.length) {
+        const now = new Date();
+        const toSave = items.map((it: any) => this.itemRepo.create({
+          prescription: { id } as any,
+          name: it.name,
+          dosage: it.dosage,
+          duration: it.duration,
+          quantity: it.quantity,
+          dayDivide: it.dayDivide ?? null,
+          method: it.method ?? null,
+          createdAt: now,
+          updatedAt: now,
+        }));
+        await this.itemRepo.save(toSave);
+      }
+    }
+    return this.findOne(id);
+  }
 
   async dispense(id: string) {
-    // Dispense simply returns prescription; actual item stock adjustments handled elsewhere
-    return this.presRepo.findOne({ where: { id }, relations: ['items','patient','doctor'] });
+    return this.presRepo.findOne({ where: { id }, relations: ['items','patient','patient.user','doctor','doctor.user'] });
   }
 
   // Role-specific filtered lists

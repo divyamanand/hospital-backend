@@ -16,11 +16,24 @@ export class InventoryController {
     if (q.type) filter.type = q.type;
     if (q.lowStock) filter.lowStock = parseInt(q.lowStock,10);
     if (q.expiryBefore) filter.expiryBefore = q.expiryBefore;
-    return this.svc.listItems(filter);
+    if (q.expiry) filter.expiryBefore = q.expiry; // alias
+    return this.svc.listItems(filter).then(rows => rows.map(r => ({
+      name: r.name,
+      quantity: r.quantity,
+      unit: r.unit,
+      expiry: (r as any).expiry || null,
+    })));
   }
   @Get('inventory/type/:type')
   @Roles('admin','pharmacist','inventory')
-  listByType(@Param('type') type: string) { return this.svc.listByType(type as any); }
+  listByType(@Param('type') type: string) { 
+    return this.svc.listItems({ type }).then(rows => rows.map(r => ({
+      name: r.name,
+      quantity: r.quantity,
+      unit: r.unit,
+      expiry: (r as any).expiry || null,
+    })));
+  }
 
   @Post('inventory')
   @Roles('admin','pharmacist','inventory')
@@ -39,11 +52,15 @@ export class InventoryController {
 
   @Post('inventory/:id/adjust')
   @Roles('admin','pharmacist','inventory')
-  adjust(@Param('id') id: string, @Body() body: { change: number; reason: string; referenceId?: string }) { return this.svc.adjustItem(id, body); }
+  adjust(@Param('id') id: string, @Body() body: { change: number; reason?: string; referenceId?: string }) {
+    return this.svc.adjustItem(id, { quantity: body.change, reason: body.reason, refPrescriptionItemId: body.referenceId });
+  }
 
   @Post('inventory/:id/add')
   @Roles('admin','pharmacist','inventory')
-  addStock(@Param('id') id: string, @Body() body: { quantity: number; referenceId?: string }) { return this.svc.addStock(id, body?.quantity, body?.referenceId); }
+  addStock(@Param('id') id: string, @Body() body: { quantity: number; referenceId?: string; unit?: string | null; expiry?: string | null }) {
+    return this.svc.addStock(id, body?.quantity, body?.referenceId, body?.unit ?? null, body?.expiry ?? null);
+  }
 
   @Post('inventory/:id/dispense')
   @Roles('admin','pharmacist','inventory')
